@@ -1,0 +1,471 @@
+// Medications database with carrier flags
+// flaggedCarriers: array of carrier IDs that this medication may trigger a review for
+// conditionHint: the condition this medication likely indicates (for underwriting notes)
+// severity: 'low' | 'medium' | 'high' — how significant the flag is
+
+export const MEDICATIONS = [
+  // ── Cardiac / Blood Thinners ──────────────────────────────────────────────
+  {
+    name: 'Warfarin (Coumadin)',
+    aliases: ['coumadin', 'warfarin'],
+    conditionHint: 'blood_thinners',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'north_american'],
+    note: 'Indicates AFib, valve disease, or clotting disorder. Will trigger blood thinner and underlying cardiac review.',
+  },
+  {
+    name: 'Apixaban (Eliquis)',
+    aliases: ['eliquis', 'apixaban'],
+    conditionHint: 'blood_thinners',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'north_american'],
+    note: 'Blood thinner — typically prescribed for AFib or DVT. Triggers cardiac review.',
+  },
+  {
+    name: 'Rivaroxaban (Xarelto)',
+    aliases: ['xarelto', 'rivaroxaban'],
+    conditionHint: 'blood_thinners',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'north_american'],
+    note: 'Blood thinner — AFib, DVT, or PE indicator.',
+  },
+  {
+    name: 'Dabigatran (Pradaxa)',
+    aliases: ['pradaxa', 'dabigatran'],
+    conditionHint: 'blood_thinners',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo'],
+    note: 'Blood thinner — AFib indicator.',
+  },
+  {
+    name: 'Digoxin (Lanoxin)',
+    aliases: ['digoxin', 'lanoxin'],
+    conditionHint: 'congestive_heart_failure',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'north_american'],
+    note: 'Prescribed for CHF or atrial fibrillation. Significant cardiac flag.',
+  },
+  {
+    name: 'Furosemide (Lasix)',
+    aliases: ['lasix', 'furosemide'],
+    conditionHint: 'congestive_heart_failure',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'north_american'],
+    note: 'Loop diuretic — commonly prescribed for CHF or kidney disease.',
+  },
+  {
+    name: 'Spironolactone (Aldactone)',
+    aliases: ['spironolactone', 'aldactone'],
+    conditionHint: 'congestive_heart_failure',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'north_american'],
+    note: 'Often prescribed for CHF, cirrhosis, or kidney disease.',
+  },
+  {
+    name: 'Carvedilol (Coreg)',
+    aliases: ['carvedilol', 'coreg'],
+    conditionHint: 'congestive_heart_failure',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'north_american'],
+    note: 'Beta-blocker often used for CHF management.',
+  },
+  {
+    name: 'Amiodarone',
+    aliases: ['amiodarone', 'pacerone', 'nexterone'],
+    conditionHint: 'pacemaker_icd',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'north_american'],
+    note: 'Prescribed for serious arrhythmias. Significant cardiac flag across all carriers.',
+  },
+  {
+    name: 'Nitroglycerin',
+    aliases: ['nitroglycerin', 'nitrostat', 'nitro'],
+    conditionHint: 'heart_attack',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'north_american'],
+    note: 'Indicates coronary artery disease or recent cardiac event.',
+  },
+
+  // ── Diabetes ──────────────────────────────────────────────────────────────
+  {
+    name: 'Metformin (Glucophage)',
+    aliases: ['metformin', 'glucophage', 'glumetza'],
+    conditionHint: 'diabetes_t2_oral',
+    severity: 'low',
+    flaggedCarriers: [],
+    note: 'Standard Type 2 oral medication. Most carriers rate favorably.',
+  },
+  {
+    name: 'Glipizide',
+    aliases: ['glipizide', 'glucotrol'],
+    conditionHint: 'diabetes_t2_oral',
+    severity: 'low',
+    flaggedCarriers: [],
+    note: 'Type 2 oral sulfonylurea — generally low impact.',
+  },
+  {
+    name: 'Glimepiride (Amaryl)',
+    aliases: ['glimepiride', 'amaryl'],
+    conditionHint: 'diabetes_t2_oral',
+    severity: 'low',
+    flaggedCarriers: [],
+    note: 'Type 2 oral sulfonylurea.',
+  },
+  {
+    name: 'Sitagliptin (Januvia)',
+    aliases: ['januvia', 'sitagliptin'],
+    conditionHint: 'diabetes_t2_oral',
+    severity: 'low',
+    flaggedCarriers: [],
+    note: 'Type 2 DPP-4 inhibitor oral med.',
+  },
+  {
+    name: 'Empagliflozin (Jardiance)',
+    aliases: ['jardiance', 'empagliflozin'],
+    conditionHint: 'diabetes_t2_oral',
+    severity: 'low',
+    flaggedCarriers: [],
+    note: 'SGLT2 inhibitor — Type 2 diabetes, also used for heart failure/kidney disease.',
+  },
+  {
+    name: 'Semaglutide (Ozempic/Wegovy)',
+    aliases: ['ozempic', 'wegovy', 'semaglutide', 'rybelsus'],
+    conditionHint: 'diabetes_t2_oral',
+    severity: 'low',
+    flaggedCarriers: [],
+    note: 'GLP-1 agonist for Type 2 diabetes or weight management.',
+  },
+  {
+    name: 'Liraglutide (Victoza/Saxenda)',
+    aliases: ['victoza', 'saxenda', 'liraglutide'],
+    conditionHint: 'diabetes_t2_oral',
+    severity: 'low',
+    flaggedCarriers: [],
+    note: 'GLP-1 agonist for Type 2 diabetes.',
+  },
+  {
+    name: 'Insulin Glargine (Lantus/Basaglar)',
+    aliases: ['lantus', 'basaglar', 'toujeo', 'insulin glargine'],
+    conditionHint: 'diabetes_t2_insulin',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'foresters', 'prosperity_life', 'north_american'],
+    note: 'Long-acting insulin — indicates insulin-dependent diabetes. Triggers review at strict carriers.',
+  },
+  {
+    name: 'Insulin Aspart (NovoLog/Fiasp)',
+    aliases: ['novolog', 'fiasp', 'insulin aspart'],
+    conditionHint: 'diabetes_t2_insulin',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'foresters', 'prosperity_life', 'north_american'],
+    note: 'Rapid-acting insulin — insulin-dependent diabetes.',
+  },
+  {
+    name: 'Insulin Lispro (Humalog)',
+    aliases: ['humalog', 'insulin lispro', 'admelog'],
+    conditionHint: 'diabetes_t2_insulin',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'foresters', 'prosperity_life', 'north_american'],
+    note: 'Rapid-acting insulin.',
+  },
+
+  // ── Respiratory ───────────────────────────────────────────────────────────
+  {
+    name: 'Tiotropium (Spiriva)',
+    aliases: ['spiriva', 'tiotropium'],
+    conditionHint: 'copd_emphysema',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'north_american'],
+    note: 'COPD bronchodilator — signals COPD/emphysema diagnosis.',
+  },
+  {
+    name: 'Fluticasone/Salmeterol (Advair)',
+    aliases: ['advair', 'fluticasone salmeterol', 'airduo'],
+    conditionHint: 'copd_emphysema',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'north_american'],
+    note: 'Combination inhaler for COPD or severe asthma.',
+  },
+  {
+    name: 'Budesonide/Formoterol (Symbicort)',
+    aliases: ['symbicort', 'budesonide formoterol'],
+    conditionHint: 'copd_emphysema',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'north_american'],
+    note: 'Combination inhaler for COPD or asthma.',
+  },
+  {
+    name: 'Albuterol (ProAir/Ventolin)',
+    aliases: ['albuterol', 'proair', 'ventolin', 'proventil'],
+    conditionHint: 'asthma',
+    severity: 'low',
+    flaggedCarriers: [],
+    note: 'Rescue inhaler for asthma — generally low impact if controlled.',
+  },
+  {
+    name: 'Prednisone (oral, long-term)',
+    aliases: ['prednisone', 'prednisolone', 'deltasone'],
+    conditionHint: 'copd_emphysema',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'north_american'],
+    note: 'Long-term oral steroids indicate serious underlying condition (COPD, autoimmune, etc.).',
+  },
+
+  // ── Neurological / Seizures ───────────────────────────────────────────────
+  {
+    name: 'Levetiracetam (Keppra)',
+    aliases: ['keppra', 'levetiracetam'],
+    conditionHint: 'seizures_epilepsy',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'north_american'],
+    note: 'Anti-epileptic — indicates seizure disorder.',
+  },
+  {
+    name: 'Phenytoin (Dilantin)',
+    aliases: ['dilantin', 'phenytoin'],
+    conditionHint: 'seizures_epilepsy',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'north_american'],
+    note: 'Anti-epileptic medication.',
+  },
+  {
+    name: 'Carbamazepine (Tegretol)',
+    aliases: ['tegretol', 'carbamazepine'],
+    conditionHint: 'seizures_epilepsy',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'north_american'],
+    note: 'Anti-epileptic — also used for bipolar disorder.',
+  },
+  {
+    name: 'Valproate (Depakote)',
+    aliases: ['depakote', 'valproate', 'valproic acid', 'depakene'],
+    conditionHint: 'seizures_epilepsy',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'north_american'],
+    note: 'Anti-epileptic — also used for bipolar disorder.',
+  },
+  {
+    name: 'Memantine (Namenda)',
+    aliases: ['namenda', 'memantine'],
+    conditionHint: 'alzheimers_dementia',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'prosperity_life', 'north_american', 'corebridge'],
+    note: 'Alzheimer\'s medication — decline trigger for nearly all carriers.',
+  },
+  {
+    name: 'Donepezil (Aricept)',
+    aliases: ['aricept', 'donepezil'],
+    conditionHint: 'alzheimers_dementia',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'prosperity_life', 'north_american', 'corebridge'],
+    note: 'Alzheimer\'s/dementia medication — triggers decline.',
+  },
+
+  // ── Mental Health ─────────────────────────────────────────────────────────
+  {
+    name: 'Lithium',
+    aliases: ['lithium', 'eskalith', 'lithobid'],
+    conditionHint: 'bipolar_disorder',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'foresters', 'americo', 'prosperity_life', 'north_american'],
+    note: 'Mood stabilizer — indicates bipolar disorder.',
+  },
+  {
+    name: 'Quetiapine (Seroquel)',
+    aliases: ['seroquel', 'quetiapine'],
+    conditionHint: 'bipolar_disorder',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'foresters', 'prosperity_life', 'north_american'],
+    note: 'Antipsychotic — may indicate bipolar or schizophrenia.',
+  },
+  {
+    name: 'Aripiprazole (Abilify)',
+    aliases: ['abilify', 'aripiprazole'],
+    conditionHint: 'bipolar_disorder',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'foresters', 'prosperity_life'],
+    note: 'Antipsychotic — bipolar or schizophrenia indicator.',
+  },
+  {
+    name: 'Clozapine (Clozaril)',
+    aliases: ['clozaril', 'clozapine'],
+    conditionHint: 'bipolar_disorder',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'north_american'],
+    note: 'Serious antipsychotic — indicates treatment-resistant schizophrenia.',
+  },
+  {
+    name: 'Sertraline (Zoloft)',
+    aliases: ['zoloft', 'sertraline'],
+    conditionHint: 'depression_anxiety',
+    severity: 'low',
+    flaggedCarriers: [],
+    note: 'Common SSRI antidepressant — generally accepted by all carriers.',
+  },
+  {
+    name: 'Escitalopram (Lexapro)',
+    aliases: ['lexapro', 'escitalopram'],
+    conditionHint: 'depression_anxiety',
+    severity: 'low',
+    flaggedCarriers: [],
+    note: 'SSRI antidepressant — generally accepted.',
+  },
+  {
+    name: 'Fluoxetine (Prozac)',
+    aliases: ['prozac', 'fluoxetine'],
+    conditionHint: 'depression_anxiety',
+    severity: 'low',
+    flaggedCarriers: [],
+    note: 'SSRI antidepressant — generally accepted.',
+  },
+
+  // ── HIV Medications ───────────────────────────────────────────────────────
+  {
+    name: 'Biktarvy (Bictegravir/FTC/TAF)',
+    aliases: ['biktarvy', 'bictegravir'],
+    conditionHint: 'hiv_aids',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'americo', 'american_amicable', 'prosperity_life', 'north_american', 'corebridge'],
+    note: 'HIV antiretroviral. Triggers decline at most carriers. Foresters Financial accepts with meds.',
+  },
+  {
+    name: 'Truvada (Emtricitabine/Tenofovir)',
+    aliases: ['truvada', 'emtricitabine tenofovir'],
+    conditionHint: 'hiv_aids',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'americo', 'american_amicable', 'prosperity_life', 'north_american', 'corebridge'],
+    note: 'HIV/PrEP medication. May indicate HIV positive status. Foresters accepts HIV+ clients.',
+  },
+  {
+    name: 'Atripla',
+    aliases: ['atripla'],
+    conditionHint: 'hiv_aids',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'americo', 'american_amicable', 'prosperity_life', 'north_american', 'corebridge'],
+    note: 'HIV antiretroviral combination therapy.',
+  },
+  {
+    name: 'Descovy (Emtricitabine/TAF)',
+    aliases: ['descovy'],
+    conditionHint: 'hiv_aids',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'americo', 'american_amicable', 'prosperity_life', 'north_american', 'corebridge'],
+    note: 'HIV/PrEP medication.',
+  },
+
+  // ── Transplant / Immunosuppression ────────────────────────────────────────
+  {
+    name: 'Tacrolimus (Prograf)',
+    aliases: ['prograf', 'tacrolimus', 'advagraf'],
+    conditionHint: 'organ_transplant',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'prosperity_life', 'north_american'],
+    note: 'Organ transplant rejection medication. Triggers decline at all standard carriers.',
+  },
+  {
+    name: 'Cyclosporine (Neoral/Sandimmune)',
+    aliases: ['cyclosporine', 'neoral', 'sandimmune'],
+    conditionHint: 'organ_transplant',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'prosperity_life', 'north_american'],
+    note: 'Transplant/autoimmune immunosuppressant.',
+  },
+  {
+    name: 'Mycophenolate (CellCept)',
+    aliases: ['cellcept', 'mycophenolate', 'myfortic'],
+    conditionHint: 'organ_transplant',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'north_american'],
+    note: 'Organ transplant immunosuppressant.',
+  },
+
+  // ── Cancer / Chemotherapy ─────────────────────────────────────────────────
+  {
+    name: 'Imatinib (Gleevec)',
+    aliases: ['gleevec', 'imatinib'],
+    conditionHint: 'cancer',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'prosperity_life', 'north_american', 'corebridge'],
+    note: 'CML/GIST cancer medication. Active cancer flag.',
+  },
+  {
+    name: 'Methotrexate',
+    aliases: ['methotrexate', 'trexall', 'rheumatrex'],
+    conditionHint: 'rheumatoid_arthritis',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'north_american'],
+    note: 'Low-dose for RA/psoriasis is generally OK. High-dose for cancer triggers review.',
+  },
+
+  // ── Autoimmune (RA / Lupus) ───────────────────────────────────────────────
+  {
+    name: 'Hydroxychloroquine (Plaquenil)',
+    aliases: ['plaquenil', 'hydroxychloroquine'],
+    conditionHint: 'lupus',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'north_american'],
+    note: 'Lupus or RA medication — triggers review for underlying condition.',
+  },
+  {
+    name: 'Adalimumab (Humira)',
+    aliases: ['humira', 'adalimumab'],
+    conditionHint: 'rheumatoid_arthritis',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'north_american'],
+    note: 'TNF inhibitor for RA, Crohn\'s, psoriasis. Generally standard rate.',
+  },
+  {
+    name: 'Etanercept (Enbrel)',
+    aliases: ['enbrel', 'etanercept'],
+    conditionHint: 'rheumatoid_arthritis',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'north_american'],
+    note: 'TNF inhibitor for RA.',
+  },
+
+  // ── Kidney / Liver ────────────────────────────────────────────────────────
+  {
+    name: 'Torsemide',
+    aliases: ['torsemide', 'demadex'],
+    conditionHint: 'kidney_disease',
+    severity: 'medium',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'north_american'],
+    note: 'Diuretic for kidney disease or CHF.',
+  },
+  {
+    name: 'Rifaximin (Xifaxan)',
+    aliases: ['xifaxan', 'rifaximin'],
+    conditionHint: 'liver_disease',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'north_american'],
+    note: 'Prescribed for hepatic encephalopathy — indicates serious liver disease/cirrhosis.',
+  },
+  {
+    name: 'Lactulose',
+    aliases: ['lactulose', 'kristalose'],
+    conditionHint: 'liver_disease',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'north_american'],
+    note: 'For hepatic encephalopathy — serious liver disease indicator.',
+  },
+
+  // ── Oxygen / COPD End-Stage ───────────────────────────────────────────────
+  {
+    name: 'Home Oxygen Therapy',
+    aliases: ['oxygen', 'home oxygen', 'o2', 'supplemental oxygen'],
+    conditionHint: 'oxygen_use',
+    severity: 'high',
+    flaggedCarriers: ['mutual_of_omaha', 'transamerica', 'foresters', 'americo', 'american_amicable', 'prosperity_life', 'north_american', 'corebridge'],
+    note: 'Home oxygen use is a decline at all carriers except Corebridge GI.',
+  },
+]
+
+// Helper: search medications by partial name
+export function searchMedications(query) {
+  if (!query || query.length < 2) return []
+  const q = query.toLowerCase()
+  return MEDICATIONS.filter(
+    (m) =>
+      m.name.toLowerCase().includes(q) ||
+      m.aliases.some((a) => a.toLowerCase().includes(q))
+  ).slice(0, 10)
+}
