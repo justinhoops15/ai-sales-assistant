@@ -82,7 +82,35 @@ function BMIStrip({ ft, inch, weight }) {
   )
 }
 
-export default function Step2ClientInfo({ data, onChange, onNext, onBack }) {
+// Auto-format MM/DD/YYYY — strips non-digits, inserts slashes as user types
+function formatDOB(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 8)
+  if (digits.length <= 2) return digits
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+}
+
+// Auto-format 000-000-0000 — strips non-digits, inserts dashes as user types
+function formatPhone(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 10)
+  if (digits.length <= 3) return digits
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+}
+
+// Shared toggle button style (matches Tobacco toggle styling)
+function toggleBtnStyle(isActive) {
+  return {
+    flex: 1, padding: '9px 18px', borderRadius: 'var(--radius-sm)',
+    border: `1px solid ${isActive ? '#7c3aed' : '#2a2a2a'}`,
+    background: isActive ? 'rgba(124,58,237,0.1)' : 'transparent',
+    color: isActive ? '#a78bfa' : '#888888',
+    fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+    transition: 'all var(--transition)',
+  }
+}
+
+export default function Step2ClientInfo({ data, onChange, onNext, onBack, onCancel, onFollowUp }) {
   function set(field, val) {
     onChange({ ...data, [field]: val })
   }
@@ -117,7 +145,8 @@ export default function Step2ClientInfo({ data, onChange, onNext, onBack }) {
           </div>
         </div>
 
-        <div className="form-grid grid-3" style={{ marginBottom: 16 }}>
+        {/* Row 1: Age | Sex | State */}
+        <div className="form-grid grid-3" style={{ marginBottom: 8 }}>
           <div className="field">
             <label className="field-label">Age</label>
             <input className="field-input" type="number" min="18" max="99" placeholder="e.g. 58" value={data.age} onChange={e => set('age', e.target.value)} />
@@ -156,6 +185,87 @@ export default function Step2ClientInfo({ data, onChange, onNext, onBack }) {
           </div>
         </div>
 
+        {/* Row 2: D.O.B | (empty) | Phone — aligns under Age and State */}
+        <div className="form-grid grid-3" style={{ marginBottom: 16 }}>
+          <div className="field">
+            <label className="field-label">Date of Birth</label>
+            <input
+              className="field-input"
+              type="text"
+              inputMode="numeric"
+              placeholder="MM/DD/YYYY"
+              value={data.dateOfBirth || ''}
+              onChange={e => set('dateOfBirth', formatDOB(e.target.value))}
+              maxLength={10}
+            />
+          </div>
+          <div /> {/* spacer — keeps Phone aligned under State */}
+          <div className="field">
+            <label className="field-label">Phone Number</label>
+            <input
+              className="field-input"
+              type="text"
+              inputMode="numeric"
+              placeholder="000-000-0000"
+              value={data.phoneNumber || ''}
+              onChange={e => set('phoneNumber', formatPhone(e.target.value))}
+              maxLength={12}
+            />
+          </div>
+        </div>
+
+        <hr className="section-divider" />
+
+        {/* Marital Status */}
+        <div className="section-eyebrow">Marital Status</div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div className="radio-row" style={{ marginBottom: data.maritalStatus === 'Married' ? 12 : 0 }}>
+            {['Married', 'Single'].map(status => (
+              <button
+                key={status}
+                type="button"
+                style={toggleBtnStyle(data.maritalStatus === status)}
+                onClick={() => {
+                  if (status === 'Single') {
+                    setMany({ maritalStatus: 'Single', spouseName: '' })
+                  } else {
+                    set('maritalStatus', status)
+                  }
+                }}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+          {data.maritalStatus === 'Married' && (
+            <div className="field">
+              <label className="field-label">Spouse Name</label>
+              <input
+                className="field-input"
+                type="text"
+                placeholder="Spouse's full name"
+                value={data.spouseName || ''}
+                onChange={e => set('spouseName', e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Beneficiary */}
+        <div className="section-eyebrow">Beneficiary</div>
+
+        <div className="field" style={{ marginBottom: 16 }}>
+          <label className="field-label">Beneficiary Name</label>
+          <input
+            className="field-input"
+            type="text"
+            placeholder="Full name of beneficiary"
+            value={data.beneficiaryName || ''}
+            onChange={e => set('beneficiaryName', e.target.value)}
+          />
+        </div>
+
         <hr className="section-divider" />
 
         {/* Tobacco Use */}
@@ -173,14 +283,7 @@ export default function Step2ClientInfo({ data, onChange, onNext, onBack }) {
                 <button
                   key={String(opt.value)}
                   type="button"
-                  style={{
-                    flex: 1, padding: '9px 18px', borderRadius: 'var(--radius-sm)',
-                    border: `1px solid ${isActive ? '#7c3aed' : '#2a2a2a'}`,
-                    background: isActive ? 'rgba(124,58,237,0.1)' : 'transparent',
-                    color: isActive ? '#a78bfa' : '#888888',
-                    fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
-                    transition: 'all var(--transition)',
-                  }}
+                  style={toggleBtnStyle(isActive)}
                   onClick={() => {
                     if (opt.value === true) {
                       setMany({ tobacco: true })
@@ -251,7 +354,11 @@ export default function Step2ClientInfo({ data, onChange, onNext, onBack }) {
       </div>
 
       <div className="step-actions">
-        <button className="btn btn-secondary" onClick={onBack}>Back</button>
+        <div className="step-actions-left">
+          <button className="btn btn-secondary" onClick={onBack}>Back</button>
+          <button className="btn btn-cancel"   onClick={onCancel}>Cancel</button>
+          <button className="btn btn-followup" onClick={onFollowUp}>Not Sold / Follow Up</button>
+        </div>
         <button className="btn btn-primary" onClick={onNext} disabled={!canProceed}>Continue</button>
       </div>
     </div>

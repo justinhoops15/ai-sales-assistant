@@ -83,8 +83,10 @@ export default function Step7Results({
   onNewAppointment,
   onBack,
   onSelectApplication,
+  onCancel,
+  onFollowUp,
 }) {
-  const { approved, declined } = results
+  const { approved, declined, allGraded2 } = results
   const client    = formData.clientInfo
   const financial = formData.financial
 
@@ -145,7 +147,11 @@ export default function Step7Results({
         </div>
         {declined.length > 0 && <DeclinedSection declined={declined} />}
         <div className="step-actions">
-          <button className="btn btn-secondary" onClick={onBack}>Revise Bills</button>
+          <div className="step-actions-left">
+            <button className="btn btn-secondary" onClick={onBack}>Revise Bills</button>
+            <button className="btn btn-cancel"   onClick={onCancel}>Cancel</button>
+            <button className="btn btn-followup" onClick={onFollowUp}>Not Sold / Follow Up</button>
+          </div>
           <button className="btn btn-primary" onClick={onNewAppointment}>New Appointment</button>
         </div>
       </div>
@@ -164,6 +170,17 @@ export default function Step7Results({
           {' · ranked by est. 1st-year commission'}
         </p>
       </div>
+
+      {/* All-graded warning — shown when every qualifying carrier has a 2-year waiting period */}
+      {allGraded2 && (
+        <div className="all-graded-warning">
+          <span className="all-graded-warning-icon">⚠</span>
+          <span>
+            All available carriers for this client result in a 2-year graded benefit.
+            Review carefully before proceeding.
+          </span>
+        </div>
+      )}
 
       {/* Client summary bar */}
       <div className="client-bar">
@@ -430,7 +447,11 @@ export default function Step7Results({
 
       {/* Actions */}
       <div className="step-actions">
-        <button className="btn btn-secondary" onClick={onBack}>Revise Bills</button>
+        <div className="step-actions-left">
+          <button className="btn btn-secondary" onClick={onBack}>Revise Bills</button>
+          <button className="btn btn-cancel"   onClick={onCancel}>Cancel</button>
+          <button className="btn btn-followup" onClick={onFollowUp}>Not Sold / Follow Up</button>
+        </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn btn-ghost" onClick={() => window.print()}>Print Summary</button>
           <button className="btn btn-primary" onClick={onNewAppointment}>New Appointment</button>

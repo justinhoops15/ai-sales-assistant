@@ -49,7 +49,7 @@ const SECTIONS = [
   },
 ]
 
-export default function Step3Conditions({ data, onChange, onNext, onBack }) {
+export default function Step3Conditions({ data, onChange, onNext, onBack, onCancel, onFollowUp }) {
   function toggle(key) {
     if (data[key] !== undefined) {
       const next = { ...data }
@@ -128,7 +128,11 @@ export default function Step3Conditions({ data, onChange, onNext, onBack }) {
       </div>
 
       <div className="step-actions">
-        <button className="btn btn-secondary" onClick={onBack}>Back</button>
+        <div className="step-actions-left">
+          <button className="btn btn-secondary" onClick={onBack}>Back</button>
+          <button className="btn btn-cancel"   onClick={onCancel}>Cancel</button>
+          <button className="btn btn-followup" onClick={onFollowUp}>Not Sold / Follow Up</button>
+        </div>
         <button className="btn btn-primary" onClick={onNext}>Continue</button>
       </div>
     </div>

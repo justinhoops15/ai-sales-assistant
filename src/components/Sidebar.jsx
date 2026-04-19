@@ -23,6 +23,17 @@ function IconPlus() {
   )
 }
 
+function IconUsers() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="6" cy="5" r="2.5"/>
+      <path d="M1 13c0-2.5 2-4 5-4s5 1.5 5 4"/>
+      <circle cx="12" cy="5" r="2" opacity="0.6"/>
+      <path d="M14.5 13c0-1.8-1.2-3-3-3.5" opacity="0.6"/>
+    </svg>
+  )
+}
+
 function IconCheck() {
   return (
     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -57,6 +68,14 @@ export default function Sidebar({ agentInfo, activeView, currentStep, onNavigate
         >
           <span className="sidebar-item-icon"><IconPlus /></span>
           New Appointment
+        </button>
+
+        <button
+          onClick={() => onNavigate('clients')}
+          className={`sidebar-item${activeView === 'clients' ? ' active' : ''}`}
+        >
+          <span className="sidebar-item-icon"><IconUsers /></span>
+          Clients
         </button>
 
         {/* Step tracker */}

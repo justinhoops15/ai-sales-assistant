@@ -20,7 +20,7 @@ function shortName(id) {
   return CARRIER_SHORT[id] || id.slice(0, 4).toUpperCase()
 }
 
-export default function Step4Medications({ data, conditions, onChange, onNext, onBack }) {
+export default function Step4Medications({ data, conditions, onChange, onNext, onBack, onCancel, onFollowUp }) {
   const [query,        setQuery]        = useState('')
   const [suggestions,  setSuggestions]  = useState([])
   const [open,         setOpen]         = useState(false)
@@ -245,7 +245,11 @@ export default function Step4Medications({ data, conditions, onChange, onNext, o
       </div>
 
       <div className="step-actions">
-        <button className="btn btn-secondary" onClick={onBack}>Back</button>
+        <div className="step-actions-left">
+          <button className="btn btn-secondary" onClick={onBack}>Back</button>
+          <button className="btn btn-cancel"   onClick={onCancel}>Cancel</button>
+          <button className="btn btn-followup" onClick={onFollowUp}>Not Sold / Follow Up</button>
+        </div>
         <button className="btn btn-primary" onClick={onNext}>Continue</button>
       </div>
     </div>

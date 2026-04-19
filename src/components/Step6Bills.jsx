@@ -14,7 +14,7 @@ const FIELDS = [
   { key: 'extras',          label: 'Extras / Other' },
 ]
 
-export default function Step6Bills({ data, onChange, monthlyIncome, onNext, onBack }) {
+export default function Step6Bills({ data, onChange, monthlyIncome, onNext, onBack, onCancel, onFollowUp }) {
   function set(key, val) {
     onChange({ ...data, [key]: val })
   }
@@ -120,7 +120,11 @@ export default function Step6Bills({ data, onChange, monthlyIncome, onNext, onBa
       </div>
 
       <div className="step-actions">
-        <button className="btn btn-secondary" onClick={onBack}>Back</button>
+        <div className="step-actions-left">
+          <button className="btn btn-secondary" onClick={onBack}>Back</button>
+          <button className="btn btn-cancel"   onClick={onCancel}>Cancel</button>
+          <button className="btn btn-followup" onClick={onFollowUp}>Not Sold / Follow Up</button>
+        </div>
         <button className="btn btn-primary" onClick={onNext}>Run Underwriting</button>
       </div>
     </div>

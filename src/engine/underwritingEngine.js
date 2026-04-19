@@ -414,5 +414,13 @@ export function runUnderwriting(formData, agentContractLevel) {
     return bDol - aDol
   })
 
-  return { approved, declined }
+  // ── 2-year graded benefit override ────────────────────────────────────────
+  // Any carrier resulting in a 2-year graded benefit must never appear as the
+  // top recommendation. Move all graded-2 carriers to the bottom of the list,
+  // preserving relative order within each group.
+  const nonGraded2 = approved.filter(r => r.waitingPeriod !== 2)
+  const graded2    = approved.filter(r => r.waitingPeriod === 2)
+  const sortedApproved = [...nonGraded2, ...graded2]
+
+  return { approved: sortedApproved, declined }
 }

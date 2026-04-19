@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { searchOccupations } from '../data/occupations.js'
 
-export default function Step5Financial({ data, onChange, leadType, onNext, onBack }) {
+export default function Step5Financial({ data, onChange, leadType, onNext, onBack, onCancel, onFollowUp }) {
   const [occQuery,       setOccQuery]       = useState(data.occupation || '')
   const [occSuggestions, setOccSuggestions] = useState([])
   const [occOpen,        setOccOpen]        = useState(false)
@@ -238,7 +238,11 @@ export default function Step5Financial({ data, onChange, leadType, onNext, onBac
       </div>
 
       <div className="step-actions">
-        <button className="btn btn-secondary" onClick={onBack}>Back</button>
+        <div className="step-actions-left">
+          <button className="btn btn-secondary" onClick={onBack}>Back</button>
+          <button className="btn btn-cancel"   onClick={onCancel}>Cancel</button>
+          <button className="btn btn-followup" onClick={onFollowUp}>Not Sold / Follow Up</button>
+        </div>
         <button className="btn btn-primary" onClick={onNext}>Continue</button>
       </div>
     </div>

@@ -76,6 +76,14 @@ export default function ApplicationScreen({
 
   const [planCode,       setPlanCode]       = useState(codes[0] || '')
   const [monthlyPremium, setMonthlyPremium] = useState('')
+  const [dateEnforced,   setDateEnforced]   = useState('')
+
+  function formatDateEnforced(val) {
+    const d = val.replace(/\D/g, '').slice(0, 8)
+    if (d.length <= 2) return d
+    if (d.length <= 4) return `${d.slice(0,2)}/${d.slice(2)}`
+    return `${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4)}`
+  }
 
   return (
     <div className="animate-in" style={{ maxWidth: 672, margin: '0 auto' }}>
@@ -136,6 +144,27 @@ export default function ApplicationScreen({
           />
         </div>
 
+        {/* Date Enforced */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #2a2a2a' }}>
+          <span style={{ fontSize: 14, color: '#888888', flexShrink: 0, marginRight: 16 }}>Date Enforced</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="MM/DD/YYYY"
+            value={dateEnforced}
+            onChange={e => setDateEnforced(formatDateEnforced(e.target.value))}
+            maxLength={10}
+            style={{
+              background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 'var(--radius-sm)',
+              color: '#ffffff', fontSize: 14, fontWeight: 500, padding: '6px 12px',
+              minWidth: 160, textAlign: 'right', outline: 'none', fontFamily: 'inherit',
+              transition: 'border-color 150ms ease',
+            }}
+            onFocus={e => e.target.style.borderColor = '#22d3ee'}
+            onBlur={e => e.target.style.borderColor = '#2a2a2a'}
+          />
+        </div>
+
         {rec.waitingPeriod > 0 && (
           <CardRow
             label="Waiting Period"
@@ -148,7 +177,7 @@ export default function ApplicationScreen({
       {/* Decision buttons */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 20 }}>
         <button
-          onClick={() => onPreApproved({ planCode, monthlyPremium })}
+          onClick={() => onPreApproved({ planCode, monthlyPremium, dateEnforced })}
           style={{
             padding: '18px 24px', background: 'rgba(76,175,132,0.1)',
             border: '2px solid rgba(76,175,132,0.4)', color: '#4caf84',

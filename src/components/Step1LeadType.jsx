@@ -3,7 +3,7 @@ function IllustrationHouse({ active }) {
   const fill    = active ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)'
   const stroke  = active ? '#a78bfa' : '#444444'
   return (
-    <svg width="72" height="64" viewBox="0 0 72 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="108" height="96" viewBox="0 0 72 64" fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Ground */}
       <rect x="8" y="54" width="56" height="3" rx="1.5" fill={active ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.06)'} />
       {/* Main house body */}
@@ -36,7 +36,7 @@ function IllustrationHeart({ active }) {
   const fill   = active ? 'rgba(124,58,237,0.18)' : 'rgba(255,255,255,0.05)'
   const stroke = active ? '#a78bfa' : '#444444'
   return (
-    <svg width="72" height="64" viewBox="0 0 72 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="108" height="96" viewBox="0 0 72 64" fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Large heart */}
       <path
         d="M36 52C36 52 12 38 12 22C12 15.37 17.37 10 24 10C28.2 10 31.9 12.2 34 15.5C36.1 12.2 39.8 10 44 10C50.63 10 56 15.37 56 22C56 38 36 52 36 52Z"
@@ -59,7 +59,7 @@ function IllustrationShield({ active }) {
   const fill   = active ? 'rgba(124,58,237,0.18)' : 'rgba(255,255,255,0.05)'
   const stroke = active ? '#a78bfa' : '#444444'
   return (
-    <svg width="72" height="64" viewBox="0 0 72 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="108" height="96" viewBox="0 0 72 64" fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Shield body */}
       <path
         d="M36 8L14 16V34C14 45 24 54 36 58C48 54 58 45 58 34V16L36 8Z"
@@ -105,7 +105,7 @@ const LEAD_TYPES = [
   },
 ]
 
-export default function Step1LeadType({ value, onChange, onNext }) {
+export default function Step1LeadType({ value, onChange, onNext, onCancel, onFollowUp }) {
   return (
     <div className="animate-in">
       <div className="step-header">
@@ -138,7 +138,11 @@ export default function Step1LeadType({ value, onChange, onNext }) {
         })}
       </div>
 
-      <div className="step-actions" style={{ justifyContent: 'flex-end' }}>
+      <div className="step-actions">
+        <div className="step-actions-left">
+          <button className="btn btn-cancel"   onClick={onCancel}>Cancel</button>
+          <button className="btn btn-followup" onClick={onFollowUp}>Not Sold / Follow Up</button>
+        </div>
         <button className="btn btn-primary" onClick={onNext} disabled={!value}>
           Continue
         </button>
