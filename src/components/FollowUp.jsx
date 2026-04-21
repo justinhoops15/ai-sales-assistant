@@ -584,9 +584,6 @@ export default function FollowUp({ onResumeFollowUp, onNewAppointment, onCountCh
           <h1 className="fu-title">Follow Up</h1>
           <p className="fu-sub">{records.length} client{records.length !== 1 ? 's' : ''} in pipeline</p>
         </div>
-        <button className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={onNewAppointment}>
-          + New Appointment
-        </button>
       </div>
 
       {/* Stat boxes */}
@@ -651,9 +648,6 @@ export default function FollowUp({ onResumeFollowUp, onNewAppointment, onCountCh
           <div className="fu-empty-sub">
             When you save a client as "Not Sold", they'll appear here for follow-up tracking.
           </div>
-          <button className="btn btn-primary" style={{ marginTop: 20 }} onClick={onNewAppointment}>
-            Start New Appointment
-          </button>
         </div>
       ) : displayed.length === 0 ? (
         <div className="fu-empty">

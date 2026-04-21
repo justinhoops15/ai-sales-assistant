@@ -401,9 +401,6 @@ export default function Clients({ onEdit, onNewAppointment }) {
           <h1 className="clients-title">Clients</h1>
           <p className="clients-sub">{appointments.length} sold {appointments.length === 1 ? 'policy' : 'policies'} on record</p>
         </div>
-        <button className="btn btn-primary" onClick={onNewAppointment} style={{ alignSelf: 'flex-start' }}>
-          + New Appointment
-        </button>
       </div>
 
       {/* Summary stats */}
@@ -473,9 +470,6 @@ export default function Clients({ onEdit, onNewAppointment }) {
           </div>
           <div className="clients-empty-title">No clients yet</div>
           <div className="clients-empty-sub">Policies you mark as sold will appear here.</div>
-          <button className="btn btn-primary" style={{ marginTop: 20 }} onClick={onNewAppointment}>
-            Start New Appointment
-          </button>
         </div>
       ) : sorted.length === 0 ? (
         <div className="clients-empty">
