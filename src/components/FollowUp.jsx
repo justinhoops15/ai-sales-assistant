@@ -80,6 +80,11 @@ function fmtDate(iso) {
   } catch { return iso }
 }
 
+function fmtMoney(n) {
+  if (n == null || isNaN(n)) return null
+  return '$' + Math.round(n).toLocaleString()
+}
+
 function fmtContactDate(isoDate) {
   if (!isoDate) return '—'
   const [y, m, d] = isoDate.split('-')
@@ -164,6 +169,12 @@ function ViewDetailsModal({ record, onClose }) {
                 <span className="fu-details-item-val">Step {record.currentStep || '—'} of 7</span>
               </div>
             </div>
+          </div>
+
+          {/* Quote Snapshot */}
+          <div>
+            <div className="fu-details-section-label">Quote Snapshot</div>
+            <QuoteBlock qs={record.quoteSnapshot} inline={false} />
           </div>
 
           {/* Client Info */}
@@ -283,6 +294,59 @@ function DeleteModal({ name, onConfirm, onCancel }) {
   )
 }
 
+// ── Quote Snapshot Block (card + modal reuse) ────────────────────────────────
+function QuoteBlock({ qs, inline }) {
+  const coverage = qs?.coverage ? fmtMoney(qs.coverage) : null
+  const premium  = qs?.monthlyPremium ? fmtMoney(qs.monthlyPremium) : null
+
+  if (!qs) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: inline ? '8px 0' : '9px 12px',
+        background: inline ? 'transparent' : 'rgba(255,255,255,0.02)',
+        border: inline ? 'none' : '1px solid rgba(255,255,255,0.04)',
+        borderRadius: 6,
+      }}>
+        <span style={{ fontSize: 11, color: '#333333', fontStyle: 'italic' }}>
+          Not yet quoted — client saved before reaching results
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: '6px 12px',
+      padding: inline ? '8px 0' : '10px 12px',
+      background: inline ? 'transparent' : 'rgba(255,255,255,0.02)',
+      border: inline ? 'none' : '1px solid rgba(255,255,255,0.04)',
+      borderRadius: 6,
+    }}>
+      <div>
+        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.09em', color: '#444444', marginBottom: 2 }}>Carrier</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#cccccc' }}>{qs.carrier || '—'}</div>
+      </div>
+      <div>
+        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.09em', color: '#444444', marginBottom: 2 }}>Product</div>
+        <div style={{ fontSize: 13, fontWeight: 500, color: '#888888' }}>{qs.product || '—'}</div>
+      </div>
+      <div>
+        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.09em', color: '#444444', marginBottom: 2 }}>Coverage</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{coverage || '—'}</div>
+      </div>
+      <div>
+        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.09em', color: '#444444', marginBottom: 2 }}>Monthly Premium</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#22d3ee' }}>{premium ? `${premium}/mo` : '—'}</div>
+      </div>
+    </div>
+  )
+}
+
 // ── Single Follow Up Card ────────────────────────────────────────────────────
 function FollowUpCard({ record, onViewDetails, onResume, onDelete }) {
   const overdue   = isOverdue(record)
@@ -344,6 +408,9 @@ function FollowUpCard({ record, onViewDetails, onResume, onDelete }) {
             )}
           </div>
         </div>
+
+        {/* Quote snapshot */}
+        <QuoteBlock qs={record.quoteSnapshot} />
 
         {/* Meta rows */}
         <div className="fu-meta-grid">

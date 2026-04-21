@@ -330,6 +330,15 @@ export default function App() {
       const existing = JSON.parse(localStorage.getItem('follow_up_appointments') || '[]')
       const newNote  = { date: new Date().toISOString(), text: note || '' }
 
+      // Snapshot the top approved carrier if results exist (agent reached Step 7)
+      const topRec = results?.approved?.[0] ?? null
+      const quoteSnapshot = topRec ? {
+        carrier:        topRec.name,
+        product:        topRec.product?.name || topRec.productLabel || null,
+        coverage:       topRec.recommendedFace || null,
+        monthlyPremium: topRec.monthlyPremium?.mid || null,
+      } : null
+
       if (activeFollowUpId) {
         // Update the existing follow-up record — add note to timeline
         const updated = existing.map(r => {
@@ -341,6 +350,7 @@ export default function App() {
             lastContacted: new Date().toISOString(),
             notes:         [newNote, ...(r.notes || [])],
             formData:      { ...formData },
+            quoteSnapshot: quoteSnapshot ?? r.quoteSnapshot ?? null,
           }
         })
         localStorage.setItem('follow_up_appointments', JSON.stringify(updated))
@@ -358,6 +368,7 @@ export default function App() {
           nextContactDate,
           lastContacted:   null,
           notes:           [newNote],
+          quoteSnapshot,
         }
         existing.push(record)
         localStorage.setItem('follow_up_appointments', JSON.stringify(existing))
