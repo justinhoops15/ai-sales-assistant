@@ -320,6 +320,56 @@ export default function App() {
     }
   }
 
+  // ── Save to Follow Up from Appointment Summary ─────────────────────────────
+  function handleSaveApptToFollowUp({ note, priority, nextContactDate }) {
+    try {
+      const existing = JSON.parse(localStorage.getItem('follow_up_appointments') || '[]')
+      const newNote  = { date: new Date().toISOString(), text: note || '' }
+      const quoteSnapshot = selectedApp ? {
+        carrier:        selectedApp.rec?.name || null,
+        product:        selectedApp.rec?.product?.name || selectedApp.rec?.productLabel || null,
+        coverage:       selectedApp.face || null,
+        monthlyPremium: selectedApp.monthlyPremium ? parseFloat(selectedApp.monthlyPremium) : (selectedApp.rec?.monthlyPremium?.mid || null),
+        planCode:       selectedApp.planCode || null,
+        dateEnforced:   selectedApp.dateEnforced || null,
+        tier:           selectedApp.rec?.tier || null,
+        commissionPct:  selectedApp.rec?.commissionPct || null,
+      } : null
+      const record = {
+        id:              Date.now(),
+        savedAt:         new Date().toISOString(),
+        currentStep:     7,
+        agentName:       agentInfo?.name || '',
+        agentLevel:      agentInfo?.contractLevel || '',
+        formData:        { ...formData },
+        priority,
+        nextContactDate,
+        lastContacted:   null,
+        notes:           [newNote],
+        quoteSnapshot,
+      }
+      existing.push(record)
+      localStorage.setItem('follow_up_appointments', JSON.stringify(existing))
+      setFollowUpCount(existing.length)
+    } catch (e) {
+      console.error('Failed to save follow-up from summary:', e)
+    }
+    setFormData(initForm())
+    setResults(null)
+    setStep(1)
+    setAppScreen(null)
+    setSelectedApp(null)
+    setDeclinedKeys(new Set())
+    setReqWarning([])
+    setShowFollowUp(false)
+    setActiveFollowUpId(null)
+    setCancelContext('dashboard')
+    setShowDashboard(true)
+    setShowClients(false)
+    setShowFollowUps(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   // ── Not Sold / Follow Up ───────────────────────────────────────────────────
   function handleOpenFollowUp() {
     setShowFollowUp(true)
@@ -576,6 +626,7 @@ export default function App() {
               editingClientId={editingClientId}
               onBack={() => { setAppScreen('application'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
               onNewAppointment={handleNewAppointment}
+              onSaveToFollowUp={handleSaveApptToFollowUp}
             />
           </main>
         </div>

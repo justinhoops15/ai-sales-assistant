@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import FollowUpModal from './FollowUpModal.jsx'
 
 const LEAD_LABELS = {
   mortgage_protection: 'Mortgage Protection',
@@ -89,12 +90,14 @@ export default function AppointmentSummary({
   editingClientId,
   onBack,
   onNewAppointment,
+  onSaveToFollowUp,
 }) {
   const { rec, face } = application
   const client = formData.clientInfo
 
-  const [saved,    setSaved]    = useState(false)
-  const [saveTime, setSaveTime] = useState(null)
+  const [saved,            setSaved]            = useState(false)
+  const [saveTime,         setSaveTime]         = useState(null)
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false)
 
   function handleMarkSold() {
     saveAppointment({ application, clientName, formData, agentInfo, editingClientId })
@@ -243,13 +246,25 @@ export default function AppointmentSummary({
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn btn-ghost" onClick={() => window.print()}>Print Summary</button>
           {!saved && (
-            <button className="btn btn-success" onClick={handleMarkSold}>
-              Mark as Sold
-            </button>
+            <>
+              <button className="btn btn-followup" onClick={() => setShowFollowUpModal(true)}>
+                Save to Follow Up
+              </button>
+              <button className="btn btn-success" onClick={handleMarkSold}>
+                Mark as Sold
+              </button>
+            </>
           )}
           <button className="btn btn-primary" onClick={onNewAppointment}>New Appointment</button>
         </div>
       </div>
+
+      {showFollowUpModal && (
+        <FollowUpModal
+          onSave={data => { onSaveToFollowUp(data); setShowFollowUpModal(false) }}
+          onBack={() => setShowFollowUpModal(false)}
+        />
+      )}
     </div>
   )
 }
