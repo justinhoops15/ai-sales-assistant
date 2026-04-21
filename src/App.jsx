@@ -2,6 +2,7 @@ import { useState } from 'react'
 import AgentSetup          from './components/AgentSetup.jsx'
 import Clients             from './components/Clients.jsx'
 import Dashboard           from './components/Dashboard.jsx'
+import FollowUp            from './components/FollowUp.jsx'
 import FollowUpModal       from './components/FollowUpModal.jsx'
 import ProgressBar         from './components/ProgressBar.jsx'
 import Sidebar             from './components/Sidebar.jsx'
@@ -62,6 +63,11 @@ function loadAgent() {
   } catch { return null }
 }
 
+function loadFollowUpCount() {
+  try { return JSON.parse(localStorage.getItem('follow_up_appointments') || '[]').length }
+  catch { return 0 }
+}
+
 // Returns list of human-readable field names that must be filled before underwriting.
 function getRequiredMissing(formData) {
   const missing = []
@@ -74,18 +80,25 @@ function getRequiredMissing(formData) {
 }
 
 export default function App() {
-  const [agentInfo,      setAgentInfo]      = useState(loadAgent)
-  const [showDashboard,  setShowDashboard]  = useState(true)
-  const [step,           setStep]           = useState(1)
-  const [formData,       setFormData]       = useState(initForm)
-  const [results,        setResults]        = useState(null)
-  const [appScreen,      setAppScreen]      = useState(null)  // null | 'application' | 'summary'
-  const [selectedApp,    setSelectedApp]    = useState(null)
-  const [declinedKeys,   setDeclinedKeys]   = useState(() => new Set())
-  const [showFollowUp,    setShowFollowUp]    = useState(false)
-  const [reqWarning,      setReqWarning]      = useState([])
-  const [showClients,     setShowClients]     = useState(false)
-  const [editingClientId, setEditingClientId] = useState(null)
+  const [agentInfo,        setAgentInfo]        = useState(loadAgent)
+  const [showDashboard,    setShowDashboard]    = useState(true)
+  const [showClients,      setShowClients]      = useState(false)
+  const [showFollowUps,    setShowFollowUps]    = useState(false)
+  const [step,             setStep]             = useState(1)
+  const [formData,         setFormData]         = useState(initForm)
+  const [results,          setResults]          = useState(null)
+  const [appScreen,        setAppScreen]        = useState(null)  // null | 'application' | 'summary'
+  const [selectedApp,      setSelectedApp]      = useState(null)
+  const [declinedKeys,     setDeclinedKeys]     = useState(() => new Set())
+  const [showFollowUp,     setShowFollowUp]     = useState(false)
+  const [reqWarning,       setReqWarning]       = useState([])
+  const [editingClientId,  setEditingClientId]  = useState(null)
+  // Track how the appointment flow was launched so Cancel returns correctly
+  const [cancelContext,    setCancelContext]    = useState('dashboard') // 'dashboard' | 'clients' | 'followups'
+  // ID of the follow-up record being resumed (null = fresh appointment)
+  const [activeFollowUpId, setActiveFollowUpId] = useState(null)
+  // Badge count for sidebar — updated on save/delete
+  const [followUpCount,    setFollowUpCount]    = useState(loadFollowUpCount)
 
   function handleAgentSetup(info) {
     localStorage.setItem('ffl_agent', JSON.stringify(info))
@@ -124,7 +137,18 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  // ── New Appointment ────────────────────────────────────────────────────────
+  // If activeFollowUpId is set and we're on the summary screen, the agent just
+  // sold a follow-up client — remove them from follow_up_appointments.
   function handleNewAppointment() {
+    if (activeFollowUpId && appScreen === 'summary') {
+      try {
+        const existing = JSON.parse(localStorage.getItem('follow_up_appointments') || '[]')
+        const updated  = existing.filter(r => r.id !== activeFollowUpId)
+        localStorage.setItem('follow_up_appointments', JSON.stringify(updated))
+        setFollowUpCount(updated.length)
+      } catch {}
+    }
     setFormData(initForm())
     setResults(null)
     setStep(1)
@@ -135,7 +159,10 @@ export default function App() {
     setShowFollowUp(false)
     setShowDashboard(false)
     setShowClients(false)
+    setShowFollowUps(false)
     setEditingClientId(null)
+    setCancelContext('dashboard')
+    setActiveFollowUpId(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -174,6 +201,8 @@ export default function App() {
     }
     setFormData(preFilledForm)
     setEditingClientId(clientRecord.id)
+    setCancelContext('clients')      // Cancel returns to Clients, no warning
+    setActiveFollowUpId(null)
     setResults(null)
     setStep(1)
     setAppScreen(null)
@@ -183,6 +212,35 @@ export default function App() {
     setShowFollowUp(false)
     setShowDashboard(false)
     setShowClients(false)
+    setShowFollowUps(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // ── Resume a follow-up client (pre-fill entire saved formData) ─────────────
+  function handleResumeFollowUp(record) {
+    // Update lastContacted in localStorage immediately
+    try {
+      const existing = JSON.parse(localStorage.getItem('follow_up_appointments') || '[]')
+      const updated  = existing.map(r =>
+        r.id === record.id ? { ...r, lastContacted: new Date().toISOString() } : r
+      )
+      localStorage.setItem('follow_up_appointments', JSON.stringify(updated))
+    } catch {}
+
+    setFormData(record.formData ? { ...record.formData } : initForm())
+    setActiveFollowUpId(record.id)
+    setCancelContext('followups')    // Cancel returns to Follow Up, no warning
+    setEditingClientId(null)
+    setResults(null)
+    setStep(1)
+    setAppScreen(null)
+    setSelectedApp(null)
+    setDeclinedKeys(new Set())
+    setReqWarning([])
+    setShowFollowUp(false)
+    setShowDashboard(false)
+    setShowClients(false)
+    setShowFollowUps(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -207,8 +265,12 @@ export default function App() {
   }
 
   // ── Cancel appointment ─────────────────────────────────────────────────────
+  // Behavior differs by context:
+  //   'clients'   → return to Clients, no warning (data saved in Clients)
+  //   'followups' → return to Follow Up, no warning (data saved in Follow Up)
+  //   'dashboard' → confirm dialog, return to Dashboard on confirm
   function handleCancel() {
-    if (window.confirm('Are you sure you want to cancel? All appointment data will be lost.')) {
+    if (cancelContext === 'clients') {
       setFormData(initForm())
       setResults(null)
       setStep(1)
@@ -217,8 +279,44 @@ export default function App() {
       setDeclinedKeys(new Set())
       setReqWarning([])
       setShowFollowUp(false)
-      setShowDashboard(true)
+      setActiveFollowUpId(null)
+      setCancelContext('dashboard')
+      setShowClients(true)
+      setShowDashboard(false)
+      setShowFollowUps(false)
       window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else if (cancelContext === 'followups') {
+      setFormData(initForm())
+      setResults(null)
+      setStep(1)
+      setAppScreen(null)
+      setSelectedApp(null)
+      setDeclinedKeys(new Set())
+      setReqWarning([])
+      setShowFollowUp(false)
+      setActiveFollowUpId(null)
+      setCancelContext('dashboard')
+      setShowFollowUps(true)
+      setShowDashboard(false)
+      setShowClients(false)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      if (window.confirm('Are you sure you want to cancel? All appointment data will be lost.')) {
+        setFormData(initForm())
+        setResults(null)
+        setStep(1)
+        setAppScreen(null)
+        setSelectedApp(null)
+        setDeclinedKeys(new Set())
+        setReqWarning([])
+        setShowFollowUp(false)
+        setActiveFollowUpId(null)
+        setCancelContext('dashboard')
+        setShowDashboard(true)
+        setShowClients(false)
+        setShowFollowUps(false)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
     }
   }
 
@@ -227,23 +325,48 @@ export default function App() {
     setShowFollowUp(true)
   }
 
-  function handleSaveFollowUp(note) {
-    const record = {
-      id:           Date.now(),
-      savedAt:      new Date().toISOString(),
-      followUpNote: note,
-      currentStep:  step,
-      agentName:    agentInfo?.name || '',
-      agentLevel:   agentInfo?.contractLevel || '',
-      formData:     { ...formData },
-    }
+  function handleSaveFollowUp({ note, priority, nextContactDate }) {
     try {
       const existing = JSON.parse(localStorage.getItem('follow_up_appointments') || '[]')
-      existing.push(record)
-      localStorage.setItem('follow_up_appointments', JSON.stringify(existing))
+      const newNote  = { date: new Date().toISOString(), text: note || '' }
+
+      if (activeFollowUpId) {
+        // Update the existing follow-up record — add note to timeline
+        const updated = existing.map(r => {
+          if (r.id !== activeFollowUpId) return r
+          return {
+            ...r,
+            priority,
+            nextContactDate,
+            lastContacted: new Date().toISOString(),
+            notes:         [newNote, ...(r.notes || [])],
+            formData:      { ...formData },
+          }
+        })
+        localStorage.setItem('follow_up_appointments', JSON.stringify(updated))
+        setFollowUpCount(updated.length)
+      } else {
+        // Create a new follow-up record
+        const record = {
+          id:              Date.now(),
+          savedAt:         new Date().toISOString(),
+          currentStep:     step,
+          agentName:       agentInfo?.name || '',
+          agentLevel:      agentInfo?.contractLevel || '',
+          formData:        { ...formData },
+          priority,
+          nextContactDate,
+          lastContacted:   null,
+          notes:           [newNote],
+        }
+        existing.push(record)
+        localStorage.setItem('follow_up_appointments', JSON.stringify(existing))
+        setFollowUpCount(existing.length)
+      }
     } catch (e) {
       console.error('Failed to save follow-up appointment:', e)
     }
+
     setFormData(initForm())
     setResults(null)
     setStep(1)
@@ -252,7 +375,11 @@ export default function App() {
     setDeclinedKeys(new Set())
     setReqWarning([])
     setShowFollowUp(false)
+    setActiveFollowUpId(null)
+    setCancelContext('dashboard')
     setShowDashboard(true)
+    setShowClients(false)
+    setShowFollowUps(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -273,12 +400,21 @@ export default function App() {
     allGraded2,
   } : null
 
-  const sidebarActiveView  = showClients ? 'clients' : showDashboard ? 'dashboard' : 'appointment'
-  const sidebarCurrentStep = (!showDashboard && !showClients && appScreen === null && step >= 1) ? step : null
+  const sidebarActiveView  = showFollowUps ? 'followups' : showClients ? 'clients' : showDashboard ? 'dashboard' : 'appointment'
+  const sidebarCurrentStep = (!showDashboard && !showClients && !showFollowUps && appScreen === null && step >= 1) ? step : null
 
   function handleGoToClients() {
     setShowClients(true)
     setShowDashboard(false)
+    setShowFollowUps(false)
+    setAppScreen(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handleGoToFollowUps() {
+    setShowFollowUps(true)
+    setShowDashboard(false)
+    setShowClients(false)
     setAppScreen(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -293,16 +429,50 @@ export default function App() {
   }
 
   function handleSidebarNavigate(view) {
-    if (view === 'dashboard')   { setShowDashboard(true); setShowClients(false); setAppScreen(null) }
-    if (view === 'clients')     { setShowClients(true);   setShowDashboard(false); setAppScreen(null) }
+    if (view === 'dashboard')   { setShowDashboard(true);  setShowClients(false); setShowFollowUps(false); setAppScreen(null) }
+    if (view === 'clients')     { setShowClients(true);    setShowDashboard(false); setShowFollowUps(false); setAppScreen(null) }
+    if (view === 'followups')   { setShowFollowUps(true);  setShowDashboard(false); setShowClients(false);  setAppScreen(null) }
     if (view === 'appointment') { handleNewAppointment() }
+  }
+
+  // ── Follow Up page ─────────────────────────────────────────────────────────
+  if (showFollowUps && appScreen === null) {
+    return (
+      <div className="app">
+        <Sidebar
+          agentInfo={agentInfo}
+          activeView={sidebarActiveView}
+          currentStep={sidebarCurrentStep}
+          onNavigate={handleSidebarNavigate}
+          onChangeAgent={handleChangeAgent}
+          followUpCount={followUpCount}
+        />
+        <div className="app-body">
+          <AppHeader title="Follow Up" agentInfo={agentInfo} onChangeAgent={handleChangeAgent} />
+          <main className="app-main">
+            <FollowUp
+              onResumeFollowUp={handleResumeFollowUp}
+              onNewAppointment={handleNewAppointment}
+              onCountChange={setFollowUpCount}
+            />
+          </main>
+        </div>
+      </div>
+    )
   }
 
   // ── Clients ────────────────────────────────────────────────────────────────
   if (showClients && appScreen === null) {
     return (
       <div className="app">
-        <Sidebar agentInfo={agentInfo} activeView={sidebarActiveView} currentStep={sidebarCurrentStep} onNavigate={handleSidebarNavigate} onChangeAgent={handleChangeAgent} />
+        <Sidebar
+          agentInfo={agentInfo}
+          activeView={sidebarActiveView}
+          currentStep={sidebarCurrentStep}
+          onNavigate={handleSidebarNavigate}
+          onChangeAgent={handleChangeAgent}
+          followUpCount={followUpCount}
+        />
         <div className="app-body">
           <AppHeader title="Clients" agentInfo={agentInfo} onChangeAgent={handleChangeAgent} />
           <main className="app-main">
@@ -317,11 +487,23 @@ export default function App() {
   if (showDashboard && appScreen === null) {
     return (
       <div className="app">
-        <Sidebar agentInfo={agentInfo} activeView={sidebarActiveView} currentStep={sidebarCurrentStep} onNavigate={handleSidebarNavigate} onChangeAgent={handleChangeAgent} />
+        <Sidebar
+          agentInfo={agentInfo}
+          activeView={sidebarActiveView}
+          currentStep={sidebarCurrentStep}
+          onNavigate={handleSidebarNavigate}
+          onChangeAgent={handleChangeAgent}
+          followUpCount={followUpCount}
+        />
         <div className="app-body">
           <AppHeader title="Dashboard" agentInfo={agentInfo} onChangeAgent={handleChangeAgent} />
           <main className="app-main">
-            <Dashboard agentInfo={agentInfo} onNewAppointment={handleNewAppointment} onChangeAgent={handleChangeAgent} onGoToClients={handleGoToClients} />
+            <Dashboard
+              agentInfo={agentInfo}
+              onNewAppointment={handleNewAppointment}
+              onChangeAgent={handleChangeAgent}
+              onGoToClients={handleGoToClients}
+            />
           </main>
         </div>
       </div>
@@ -332,7 +514,14 @@ export default function App() {
   if (appScreen === 'application' && selectedApp) {
     return (
       <div className="app">
-        <Sidebar agentInfo={agentInfo} activeView={sidebarActiveView} currentStep={sidebarCurrentStep} onNavigate={handleSidebarNavigate} onChangeAgent={handleChangeAgent} />
+        <Sidebar
+          agentInfo={agentInfo}
+          activeView={sidebarActiveView}
+          currentStep={sidebarCurrentStep}
+          onNavigate={handleSidebarNavigate}
+          onChangeAgent={handleChangeAgent}
+          followUpCount={followUpCount}
+        />
         <div className="app-body">
           <AppHeader title="Application Review" agentInfo={agentInfo} onChangeAgent={handleChangeAgent} />
           <main className="app-main">
@@ -357,7 +546,14 @@ export default function App() {
   if (appScreen === 'summary' && selectedApp) {
     return (
       <div className="app">
-        <Sidebar agentInfo={agentInfo} activeView={sidebarActiveView} currentStep={sidebarCurrentStep} onNavigate={handleSidebarNavigate} onChangeAgent={handleChangeAgent} />
+        <Sidebar
+          agentInfo={agentInfo}
+          activeView={sidebarActiveView}
+          currentStep={sidebarCurrentStep}
+          onNavigate={handleSidebarNavigate}
+          onChangeAgent={handleChangeAgent}
+          followUpCount={followUpCount}
+        />
         <div className="app-body">
           <AppHeader title="Appointment Summary" agentInfo={agentInfo} onChangeAgent={handleChangeAgent} />
           <main className="app-main">
@@ -379,7 +575,14 @@ export default function App() {
   // ── Main step flow ─────────────────────────────────────────────────────────
   return (
     <div className="app">
-      <Sidebar agentInfo={agentInfo} activeView={sidebarActiveView} currentStep={sidebarCurrentStep} onNavigate={handleSidebarNavigate} onChangeAgent={handleChangeAgent} />
+      <Sidebar
+        agentInfo={agentInfo}
+        activeView={sidebarActiveView}
+        currentStep={sidebarCurrentStep}
+        onNavigate={handleSidebarNavigate}
+        onChangeAgent={handleChangeAgent}
+        followUpCount={followUpCount}
+      />
       <div className="app-body">
         <AppHeader title={`Step ${step} of 7`} agentInfo={agentInfo} onChangeAgent={handleChangeAgent} />
         <main className="app-main">
@@ -387,7 +590,7 @@ export default function App() {
             <ProgressBar currentStep={step} labels={STEP_LABELS} onStepClick={handleStepClick} hasResults={!!results} />
           )}
 
-          {/* Required fields warning — shown when agent tries to run underwriting without completing them */}
+          {/* Required fields warning */}
           {reqWarning.length > 0 && (
             <div className="req-warning animate-in">
               <span className="req-warning-icon">

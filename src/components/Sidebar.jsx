@@ -34,6 +34,17 @@ function IconUsers() {
   )
 }
 
+function IconFollowUp() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 4h12v8a1 1 0 01-1 1H3a1 1 0 01-1-1V4z"/>
+      <path d="M2 4l6 5 6-5"/>
+      <line x1="10" y1="1" x2="10" y2="4"/>
+      <line x1="6" y1="1" x2="6" y2="4"/>
+    </svg>
+  )
+}
+
 function IconCheck() {
   return (
     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -42,7 +53,7 @@ function IconCheck() {
   )
 }
 
-export default function Sidebar({ agentInfo, activeView, currentStep, onNavigate, onChangeAgent }) {
+export default function Sidebar({ agentInfo, activeView, currentStep, onNavigate, onChangeAgent, followUpCount }) {
   return (
     <aside className="sidebar">
 
@@ -76,6 +87,17 @@ export default function Sidebar({ agentInfo, activeView, currentStep, onNavigate
         >
           <span className="sidebar-item-icon"><IconUsers /></span>
           Clients
+        </button>
+
+        <button
+          onClick={() => onNavigate('followups')}
+          className={`sidebar-item${activeView === 'followups' ? ' active' : ''}`}
+        >
+          <span className="sidebar-item-icon"><IconFollowUp /></span>
+          Follow Up
+          {followUpCount > 0 && (
+            <span className="sidebar-badge">{followUpCount}</span>
+          )}
         </button>
 
         {/* Step tracker */}
