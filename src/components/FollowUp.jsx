@@ -235,19 +235,22 @@ function ViewDetailsModal({ record, onClose }) {
           )}
 
           {/* Notes history */}
-          {record.notes?.length > 0 && (
-            <div>
-              <div className="fu-details-section-label">Note History ({record.notes.length})</div>
-              <div className="fu-details-notes-list">
-                {record.notes.map((n, i) => (
-                  <div key={i} className="fu-details-note">
-                    <div className="fu-details-note-date">{fmtDate(n.date)}</div>
-                    <div className="fu-details-note-text">{n.text || <em style={{ color: '#444' }}>No note — date logged automatically</em>}</div>
-                  </div>
-                ))}
+          {(() => {
+            const filledNotes = (record.notes || []).filter(n => n.text?.trim())
+            return filledNotes.length > 0 ? (
+              <div>
+                <div className="fu-details-section-label">Note History ({filledNotes.length})</div>
+                <div className="fu-details-notes-list">
+                  {filledNotes.map((n, i) => (
+                    <div key={i} className="fu-details-note">
+                      <div className="fu-details-note-date">{fmtDate(n.date)}</div>
+                      <div className="fu-details-note-text">{n.text}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            ) : null
+          })()}
 
         </div>
 
@@ -375,7 +378,8 @@ function FollowUpCard({ record, onViewDetails, onResume, onDelete }) {
     countdownText = `Follow up in ${days} day${days !== 1 ? 's' : ''}`
   }
 
-  const recentNotes = (record.notes || []).slice(0, 2)
+  const filledNotes  = (record.notes || []).filter(n => n.text?.trim())
+  const recentNotes  = filledNotes.slice(0, 2)
 
   return (
     <div className={cardClass}>
@@ -437,7 +441,7 @@ function FollowUpCard({ record, onViewDetails, onResume, onDelete }) {
         {/* Notes */}
         <div className="fu-notes">
           <div className="fu-notes-label">
-            Notes {record.notes?.length > 0 ? `(${record.notes.length})` : ''}
+            Notes {filledNotes.length > 0 ? `(${filledNotes.length})` : ''}
           </div>
           <div className="fu-notes-list">
             {recentNotes.length === 0 ? (
@@ -445,15 +449,13 @@ function FollowUpCard({ record, onViewDetails, onResume, onDelete }) {
             ) : recentNotes.map((n, i) => (
               <div key={i} className="fu-note-item">
                 <div className="fu-note-date">{fmtDate(n.date)}</div>
-                <div className="fu-note-text">
-                  {n.text || <em style={{ color: '#444' }}>No note — contact logged</em>}
-                </div>
+                <div className="fu-note-text">{n.text}</div>
               </div>
             ))}
-            {(record.notes?.length || 0) > 2 && (
+            {filledNotes.length > 2 && (
               <div className="fu-note-item" style={{ textAlign: 'center' }}>
                 <div className="fu-note-text" style={{ color: '#555555', fontStyle: 'italic' }}>
-                  + {record.notes.length - 2} more — view details
+                  + {filledNotes.length - 2} more — view details
                 </div>
               </div>
             )}
