@@ -58,6 +58,10 @@ const US_STATES = [
   { abbr: 'WY', name: 'Wyoming' },
 ]
 
+const RELATIONSHIPS = [
+  'Spouse', 'Son', 'Daughter', 'Sibling', 'Family Member', 'Parent', 'Non-Relative',
+]
+
 function calcBMI(ft, inch, weight) {
   const inches = Number(ft) * 12 + Number(inch)
   if (!inches || !weight) return null
@@ -119,6 +123,31 @@ export default function Step2ClientInfo({ data, onChange, onNext, onBack, onCanc
   function setMany(updates) {
     onChange({ ...data, ...updates })
   }
+
+  // ── Beneficiary helpers ──────────────────────────────────────────────────
+  const beneficiaries = data.beneficiaries || [{ name: '', relationship: '', percentage: '100' }]
+
+  function updateBeneficiary(idx, field, val) {
+    const next = beneficiaries.map((b, i) => i === idx ? { ...b, [field]: val } : b)
+    set('beneficiaries', next)
+  }
+
+  function addBeneficiary() {
+    const next = [...beneficiaries, { name: '', relationship: '', percentage: '' }]
+    set('beneficiaries', next)
+  }
+
+  function removeBeneficiary(idx) {
+    const next = beneficiaries.filter((_, i) => i !== idx)
+    // Auto-reset to 100% when only one remains
+    if (next.length === 1) next[0] = { ...next[0], percentage: '100' }
+    set('beneficiaries', next)
+  }
+
+  const totalPct    = beneficiaries.reduce((sum, b) => sum + (Number(b.percentage) || 0), 0)
+  const multiMode   = beneficiaries.length > 1
+  const pctValid    = !multiMode || totalPct === 100
+  const pctWarning  = multiMode && totalPct !== 100
 
   const canProceed = data.firstName && data.lastName && data.age && data.sex
 
@@ -252,18 +281,114 @@ export default function Step2ClientInfo({ data, onChange, onNext, onBack, onCanc
           )}
         </div>
 
-        {/* Beneficiary */}
+        {/* Beneficiaries */}
         <div className="section-eyebrow">Beneficiary</div>
 
-        <div className="field" style={{ marginBottom: 16 }}>
-          <label className="field-label">Beneficiary Name</label>
-          <input
-            className="field-input"
-            type="text"
-            placeholder="Full name of beneficiary"
-            value={data.beneficiaryName || ''}
-            onChange={e => set('beneficiaryName', e.target.value)}
-          />
+        <div style={{ marginBottom: 16 }}>
+          {beneficiaries.length === 0 ? (
+            <p style={{ fontSize: 13, color: '#555555', marginBottom: 12 }}>
+              No beneficiaries added. Click below to add one.
+            </p>
+          ) : (
+            beneficiaries.map((b, idx) => (
+              <div
+                key={idx}
+                style={{
+                  marginBottom: 12,
+                  padding: '14px 16px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid #2a2a2a',
+                  borderRadius: 8,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#555555', fontWeight: 500 }}>
+                    Beneficiary {idx + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeBeneficiary(idx)}
+                    style={{
+                      background: 'none', border: '1px solid #3a2a2a', borderRadius: 4,
+                      color: '#e05c5c', cursor: 'pointer', fontSize: 13, padding: '2px 8px',
+                      fontFamily: 'inherit', lineHeight: 1.4,
+                    }}
+                    title="Remove beneficiary"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                {/* Name */}
+                <div className="field" style={{ marginBottom: 10 }}>
+                  <label className="field-label">Beneficiary Name</label>
+                  <input
+                    className="field-input"
+                    type="text"
+                    placeholder="Full name"
+                    value={b.name}
+                    onChange={e => updateBeneficiary(idx, 'name', e.target.value)}
+                  />
+                </div>
+
+                {/* Relationship + Percentage side by side */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 10 }}>
+                  <div className="field">
+                    <label className="field-label">Relationship</label>
+                    <select
+                      className="field-input"
+                      value={b.relationship}
+                      onChange={e => updateBeneficiary(idx, 'relationship', e.target.value)}
+                    >
+                      <option value="">— Select —</option>
+                      {RELATIONSHIPS.map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label className="field-label">% Share</label>
+                    <input
+                      className="field-input"
+                      type="number"
+                      min="1"
+                      max="100"
+                      placeholder="100"
+                      value={b.percentage}
+                      readOnly={!multiMode}
+                      style={{ background: !multiMode ? 'rgba(255,255,255,0.04)' : undefined, cursor: !multiMode ? 'default' : undefined }}
+                      onChange={e => multiMode && updateBeneficiary(idx, 'percentage', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+
+          {/* Add Beneficiary button */}
+          <button
+            type="button"
+            onClick={addBeneficiary}
+            style={{
+              width: '100%', padding: '9px 0', borderRadius: 6,
+              border: '1px dashed #2a2a2a', background: 'transparent',
+              color: '#888888', fontSize: 13, cursor: 'pointer',
+              fontFamily: 'inherit', transition: 'all 150ms',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#7c3aed'; e.currentTarget.style.color = '#a78bfa' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a2a'; e.currentTarget.style.color = '#888888' }}
+          >
+            + Add Beneficiary
+          </button>
+
+          {/* Percentage total indicator */}
+          {multiMode && (
+            <div style={{ marginTop: 10, fontSize: 12, fontWeight: 500, color: pctValid ? '#4caf84' : '#e05c5c' }}>
+              {pctValid
+                ? `✓ Beneficiary split is correct — total: 100%`
+                : `⚠ Beneficiary percentages must total 100% (current total: ${totalPct}%)`}
+            </div>
+          )}
         </div>
 
         <hr className="section-divider" />

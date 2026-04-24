@@ -27,7 +27,7 @@ function saveAppointment({ application, clientName, formData, agentInfo, editing
     clientPhone:      formData.clientInfo?.phoneNumber    || '',
     maritalStatus:    formData.clientInfo?.maritalStatus  || '',
     spouseName:       formData.clientInfo?.spouseName     || '',
-    beneficiaryName:  formData.clientInfo?.beneficiaryName || '',
+    beneficiaries:    formData.clientInfo?.beneficiaries  || [],
     tobacco:          formData.clientInfo?.tobacco || false,
     leadType:         formData.leadType || '',
     carrier:          rec.name,
@@ -41,6 +41,10 @@ function saveAppointment({ application, clientName, formData, agentInfo, editing
     commissionDollar: rec.commissionDollar,
     confidence:       rec.confidence,
     dateEnforced:     application.dateEnforced || '',
+    insCompany:       formData.financial?.insCompany  || '',
+    insCoverage:      formData.financial?.insCoverage || '',
+    insPremium:       formData.financial?.insPremium  || '',
+    insYear:          formData.financial?.insYear     || '',
   }
   try {
     let existing = JSON.parse(localStorage.getItem('ffl_appointments') || '[]')
@@ -154,7 +158,13 @@ export default function AppointmentSummary({
               {client.maritalStatus === 'Married' && client.spouseName && (
                 <Row label="Spouse Name" value={client.spouseName} />
               )}
-              {client.beneficiaryName && <Row label="Beneficiary"  value={client.beneficiaryName} />}
+              {(client.beneficiaries || []).filter(b => b.name?.trim()).map((b, i, arr) => (
+                <Row
+                  key={i}
+                  label={i === 0 ? 'Beneficiary' : `Beneficiary ${i + 1}`}
+                  value={[b.name, b.relationship, arr.length > 1 ? `${b.percentage}%` : null].filter(Boolean).join(' · ')}
+                />
+              ))}
               <Row label="Tobacco"     value={client.tobacco ? 'Yes' : 'No'} />
               <Row label="Lead Type"   value={LEAD_LABELS[formData.leadType] || formData.leadType} />
 
@@ -190,7 +200,7 @@ export default function AppointmentSummary({
                 <Row label="Waiting Period"    value={`${rec.waitingPeriod} year graded benefit`} warn />
               )}
 
-              {(formData.financial.income || formData.financial.mortgageBalance) && (
+              {(formData.financial.income || formData.financial.mortgageBalance || (formData.financial.hasInsurance && formData.financial.insCompany)) && (
                 <>
                   <hr className="section-divider" />
                   <SectionLabel>Financial Snapshot</SectionLabel>
@@ -202,6 +212,15 @@ export default function AppointmentSummary({
                   )}
                   {formData.financial.mortgageBalance && (
                     <Row label="Mortgage Balance" value={fmt(Number(formData.financial.mortgageBalance))} />
+                  )}
+                  {formData.financial.hasInsurance && formData.financial.insCompany && (
+                    <Row label="Existing Ins. Co." value={formData.financial.insCompany} />
+                  )}
+                  {formData.financial.hasInsurance && formData.financial.insCoverage && (
+                    <Row label="Existing Coverage" value={`$${Number(formData.financial.insCoverage).toLocaleString()}`} />
+                  )}
+                  {formData.financial.hasInsurance && formData.financial.insPremium && (
+                    <Row label="Existing Premium" value={`$${formData.financial.insPremium}/mo`} />
                   )}
                   {formData.financial.notes && (
                     <div style={{ marginTop: 12, padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>

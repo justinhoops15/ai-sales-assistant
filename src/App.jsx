@@ -37,7 +37,7 @@ function initForm() {
       state: '',
       dateOfBirth: '', phoneNumber: '',
       maritalStatus: '', spouseName: '',
-      beneficiaryName: '',
+      beneficiaries: [{ name: '', relationship: '', percentage: '100' }],
       tobacco: false, tobaccoType: '',
       heightFt: '5', heightIn: '6', weight: '',
     },
@@ -46,9 +46,11 @@ function initForm() {
     financial: {
       occupation: '', income: '', ssi: '', bills: '',
       feDesiredCoverage: '',
+      finalDisposition: '',
       hasMortgage: false,
       mortgageBalance: '', mortgagePayment: '', yearsRemaining: '', homeValue: '', equity: '',
-      hasInsurance: false, workInsurance: '', privateInsurance: '',
+      hasInsurance: false,
+      insCompany: '', insCoverage: '', insPremium: '', insYear: '',
       k401: '', stocks: '', savings: '',
       notes: '',
     },
@@ -76,6 +78,10 @@ function getRequiredMissing(formData) {
   if (!formData.clientInfo?.sex)       missing.push('Sex (Step 2)')
   if (!formData.clientInfo?.state)     missing.push('State (Step 2)')
   // tobacco defaults to false = Non-Tobacco, always considered answered
+  const isFEorVet = formData.leadType === 'final_expense' || formData.leadType === 'veteran'
+  if (isFEorVet && !formData.financial?.finalDisposition) {
+    missing.push('Method of Final Disposition (Step 5)')
+  }
   return missing
 }
 
@@ -181,7 +187,11 @@ export default function App() {
         phoneNumber:     clientRecord.clientPhone      || '',
         maritalStatus:   clientRecord.maritalStatus    || '',
         spouseName:      clientRecord.spouseName       || '',
-        beneficiaryName: clientRecord.beneficiaryName  || '',
+        beneficiaries:   clientRecord.beneficiaries?.length
+          ? clientRecord.beneficiaries
+          : clientRecord.beneficiaryName
+            ? [{ name: clientRecord.beneficiaryName, relationship: '', percentage: '100' }]
+            : [{ name: '', relationship: '', percentage: '100' }],
         tobacco:         clientRecord.tobacco          || false,
         tobaccoType:     '',
         heightFt: '5', heightIn: '6', weight: '',
@@ -191,9 +201,11 @@ export default function App() {
       financial: {
         occupation: '', income: '', ssi: '', bills: '',
         feDesiredCoverage: '',
+        finalDisposition: '',
         hasMortgage: false,
         mortgageBalance: '', mortgagePayment: '', yearsRemaining: '', homeValue: '', equity: '',
-        hasInsurance: false, workInsurance: '', privateInsurance: '',
+        hasInsurance: false,
+        insCompany: '', insCoverage: '', insPremium: '', insYear: '',
         k401: '', stocks: '', savings: '',
         notes: '',
       },

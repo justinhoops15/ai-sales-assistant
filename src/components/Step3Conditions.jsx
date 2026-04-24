@@ -29,6 +29,16 @@ const SECTIONS = [
     items: ['Cancer (non-skin)', 'ALS', "Alzheimer's/Dementia", 'AIDS/HIV'],
   },
   {
+    title: 'Specific Cancer Types',
+    items: [
+      'Leukemia', 'Lymphoma', "Hodgkin's Disease", "Non-Hodgkin's Lymphoma",
+      'Breast Cancer', 'Colon Cancer', 'Prostate Cancer', 'Lung Cancer',
+      'Skin Cancer (Melanoma)', 'Cervical Cancer', 'Ovarian Cancer',
+      'Bladder Cancer', 'Kidney Cancer', 'Thyroid Cancer', 'Pancreatic Cancer',
+      'Liver Cancer', 'Brain Tumor', 'Multiple Myeloma', 'Bone Cancer', 'Throat Cancer',
+    ],
+  },
+  {
     title: 'Organ Health',
     items: ['Kidney Disease', 'Kidney Dialysis', 'Liver Disease/Cirrhosis', 'Organ Transplant'],
   },

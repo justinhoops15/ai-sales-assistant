@@ -68,7 +68,8 @@ function roundK(n) {
   return Math.max(1000, Math.round(n / 1000) * 1000)
 }
 
-function tierFace(recommendedFace, tier) {
+function tierFace(recommendedFace, tier, tierOverride) {
+  if (tierOverride?.[tier] != null) return tierOverride[tier]
   if (tier === 'bronze') return roundK(recommendedFace * 0.50)
   if (tier === 'silver') return roundK(recommendedFace * 0.75)
   if (tier === 'gold')   return recommendedFace
@@ -112,7 +113,7 @@ export default function Step7Results({
   function getSelectedFace(rec) {
     const sel = cardSel[rec.resultKey]
     if (!sel) return null
-    if (sel.tier) return tierFace(rec.recommendedFace, sel.tier)
+    if (sel.tier) return tierFace(rec.recommendedFace, sel.tier, rec.tierOverride)
     if (sel.customAmount) {
       const n = parseInt(String(sel.customAmount).replace(/[^0-9]/g, ''))
       return n > 0 ? n : null
@@ -130,9 +131,7 @@ export default function Step7Results({
   const remainingResults = filteredByType.slice(TOP_COUNT)
   const visibleResults   = showAll ? filteredByType : topResults
 
-  const existingCoverage =
-    (Number(financial.workInsurance)    || 0) +
-    (Number(financial.privateInsurance) || 0)
+  const existingCoverage = Number(financial.insCoverage) || 0
 
   if (!approved.length) {
     return (
@@ -336,7 +335,7 @@ export default function Step7Results({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
                   {(['bronze', 'silver', 'gold']).map(t => {
                     const tc       = TIER_CONFIG[t]
-                    const face     = tierFace(rec.recommendedFace, t)
+                    const face     = tierFace(rec.recommendedFace, t, rec.tierOverride)
                     const isActive = sel.tier === t
                     return (
                       <button

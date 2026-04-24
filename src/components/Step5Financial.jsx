@@ -1,6 +1,45 @@
 import { useState } from 'react'
 import { searchOccupations } from '../data/occupations.js'
 
+// Shared toggle button style
+function toggleBtnStyle(isActive) {
+  return {
+    flex: 1, padding: '9px 18px', borderRadius: 'var(--radius-sm)',
+    border: `1px solid ${isActive ? '#7c3aed' : '#2a2a2a'}`,
+    background: isActive ? 'rgba(124,58,237,0.1)' : 'transparent',
+    color: isActive ? '#a78bfa' : '#888888',
+    fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+    transition: 'all var(--transition)',
+  }
+}
+
+// Dollar-prefix input: shows $ on focus or when field has a value
+function DollarInput({ value, onChange, placeholder, style }) {
+  const [active, setActive] = useState(!!value)
+  return (
+    <div style={{ position: 'relative' }}>
+      {(active || value) && (
+        <span style={{
+          position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+          color: '#888888', fontSize: 14, pointerEvents: 'none', zIndex: 1,
+          fontFamily: 'inherit',
+        }}>$</span>
+      )}
+      <input
+        className="field-input"
+        type="text"
+        inputMode="decimal"
+        placeholder={placeholder}
+        value={value || ''}
+        style={{ paddingLeft: (active || value) ? 24 : 12, ...style }}
+        onFocus={() => setActive(true)}
+        onBlur={() => setActive(!!value)}
+        onChange={e => onChange(e.target.value.replace(/[^0-9.]/g, ''))}
+      />
+    </div>
+  )
+}
+
 export default function Step5Financial({ data, onChange, leadType, onNext, onBack, onCancel, onFollowUp }) {
   const [occQuery,       setOccQuery]       = useState(data.occupation || '')
   const [occSuggestions, setOccSuggestions] = useState([])
@@ -34,12 +73,14 @@ export default function Step5Financial({ data, onChange, leadType, onNext, onBac
   }
 
   function clearInsurance() {
-    onChange({ ...data, hasInsurance: false, workInsurance: '', privateInsurance: '' })
+    onChange({ ...data, hasInsurance: false, insCompany: '', insCoverage: '', insPremium: '', insYear: '' })
   }
 
   const equity = data.homeValue && data.mortgageBalance
     ? Number(data.homeValue) - Number(data.mortgageBalance)
     : null
+
+  const isFEorVet = leadType === 'final_expense' || leadType === 'veteran'
 
   return (
     <div className="animate-in">
@@ -57,30 +98,6 @@ export default function Step5Financial({ data, onChange, leadType, onNext, onBac
           <label className="field-label">Monthly Income ($)</label>
           <input className="field-input" type="number" min="0" placeholder="e.g. 4000" value={data.income} onChange={e => set('income', e.target.value)} />
         </div>
-
-        {leadType === 'final_expense' && (
-          <div className="field" style={{ marginBottom: 16 }}>
-            <label className="field-label">
-              Desired Burial / Final Expense Coverage ($)
-              <span style={{ marginLeft: 8, fontSize: 11, color: '#555555', textTransform: 'none', letterSpacing: 'normal', fontWeight: 400 }}>$5,000 – $35,000</span>
-            </label>
-            <input
-              className="field-input"
-              type="number" min="5000" max="35000" step="500"
-              placeholder="e.g. 15000"
-              value={data.feDesiredCoverage || ''}
-              onChange={e => set('feDesiredCoverage', e.target.value)}
-            />
-            {data.feDesiredCoverage && (
-              <div style={{ fontSize: 12, color: '#22d3ee', marginTop: 6 }}>
-                Recommended coverage:{' '}
-                <strong>${Math.min(Math.max(Number(data.feDesiredCoverage), 5000), 35000).toLocaleString()}</strong>
-                {Number(data.feDesiredCoverage) < 5000  && ' (minimum $5,000 applied)'}
-                {Number(data.feDesiredCoverage) > 35000 && ' (maximum $35,000 applied)'}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Occupation */}
         <div style={{ position: 'relative', marginBottom: 16 }}>
@@ -191,17 +208,97 @@ export default function Step5Financial({ data, onChange, leadType, onNext, onBac
 
         {data.hasInsurance && (
           <div className="sub-section" style={{ marginBottom: 16 }}>
-            <div className="form-grid grid-2">
+            <div className="field" style={{ marginBottom: 12 }}>
+              <label className="field-label">Company</label>
+              <input
+                className="field-input"
+                type="text"
+                placeholder="e.g. MetLife, Prudential..."
+                value={data.insCompany || ''}
+                onChange={e => set('insCompany', e.target.value)}
+              />
+            </div>
+            <div className="form-grid grid-2" style={{ marginBottom: 12 }}>
               <div className="field">
-                <label className="field-label">Work / Group Coverage ($)</label>
-                <input className="field-input" type="number" min="0" placeholder="e.g. 50000" value={data.workInsurance} onChange={e => set('workInsurance', e.target.value)} />
+                <label className="field-label">Coverage Amount</label>
+                <DollarInput
+                  value={data.insCoverage}
+                  onChange={v => set('insCoverage', v)}
+                  placeholder="Coverage amount"
+                />
               </div>
               <div className="field">
-                <label className="field-label">Private Policy ($)</label>
-                <input className="field-input" type="number" min="0" placeholder="e.g. 25000" value={data.privateInsurance} onChange={e => set('privateInsurance', e.target.value)} />
+                <label className="field-label">Monthly Premium</label>
+                <DollarInput
+                  value={data.insPremium}
+                  onChange={v => set('insPremium', v)}
+                  placeholder="Monthly premium"
+                />
               </div>
             </div>
+            <div className="field">
+              <label className="field-label">Effective Year</label>
+              <input
+                className="field-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="e.g. 2018"
+                maxLength={4}
+                value={data.insYear || ''}
+                onChange={e => set('insYear', e.target.value.replace(/\D/g, '').slice(0, 4))}
+              />
+            </div>
           </div>
+        )}
+
+        {/* Method of Final Disposition — FE and Veteran only */}
+        {isFEorVet && (
+          <>
+            <hr className="section-divider" />
+            <div className="section-eyebrow">Method of Final Disposition</div>
+            <div style={{ marginBottom: 16 }}>
+              <label className="field-label" style={{ marginBottom: 10, display: 'block' }}>
+                Preferred method of final disposition
+                <span style={{ marginLeft: 8, fontSize: 11, color: '#e05c5c', fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}>
+                  Required
+                </span>
+              </label>
+              <div className="radio-row">
+                {[
+                  { value: 'burial',    label: 'Burial',    sub: 'Bronze $10k · Silver $15k · Gold $20k' },
+                  { value: 'cremation', label: 'Cremation', sub: 'Bronze $7k · Silver $10k · Gold $15k' },
+                ].map(opt => {
+                  const isActive = data.finalDisposition === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => set('finalDisposition', opt.value)}
+                      style={{
+                        flex: 1, padding: '12px 16px', borderRadius: 'var(--radius-sm)',
+                        border: `1px solid ${isActive ? '#7c3aed' : '#2a2a2a'}`,
+                        background: isActive ? 'rgba(124,58,237,0.1)' : 'transparent',
+                        cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                        transition: 'all var(--transition)',
+                      }}
+                    >
+                      <div style={{ fontSize: 14, fontWeight: 600, color: isActive ? '#a78bfa' : '#ffffff', marginBottom: 4 }}>
+                        {opt.label}
+                      </div>
+                      <div style={{ fontSize: 11, color: isActive ? 'rgba(167,139,250,0.7)' : '#555555' }}>
+                        {opt.sub}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              {!data.finalDisposition && (
+                <p style={{ fontSize: 12, color: '#555555', marginTop: 8 }}>
+                  Selection determines Bronze / Silver / Gold coverage tiers on the results page.
+                </p>
+              )}
+            </div>
+          </>
         )}
 
         <hr className="section-divider" />

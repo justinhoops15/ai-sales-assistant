@@ -154,19 +154,32 @@ function getProductGroups(carrier, leadType) {
     return groups
   }
 
-  // Veteran — VET > MP/TERM fallback, then WL if nothing else
-  const vetTerm = [...(p.VET || []), ...(p.MP || []), ...(p.TERM || [])]
-  if (vetTerm.length) return [{ label: 'Term/MP', category: 'term', products: vetTerm }]
-  const wlFe = [...(p.WL || []), ...(p.FE || [])]
-  if (wlFe.length) return [{ label: 'Whole Life', category: 'WL', products: wlFe }]
+  // Veteran — same product routing as Final Expense (burial/final expense coverage)
+  if (leadType === 'veteran') {
+    const fe = p.FE || []
+    return fe.length ? [{ label: 'Final Expense', category: 'WL', products: fe }] : []
+  }
+
   return []
+}
+
+// ── Disposition-based tier face amounts ──────────────────────────────────────
+// Cremation needs a tierOverride because 7/10/15 doesn't follow 50/75/100%.
+// Burial follows 50/75/100 of 20000 exactly — no override needed.
+const DISPOSITION_FACE = {
+  burial:    20000,
+  cremation: 15000,
+}
+const DISPOSITION_TIER_OVERRIDE = {
+  cremation: { bronze: 7000, silver: 10000, gold: 15000 },
 }
 
 // ── Recommended face amount ───────────────────────────────────────────────────
 function getRecommendedFace(leadType, financial, clientInfo) {
-  const income      = parseInt(String(financial?.income           || '0').replace(/\D/g, '')) || 0
-  const mortgage    = parseInt(String(financial?.mortgageBalance  || '0').replace(/\D/g, '')) || 0
-  const feDesired   = parseInt(String(financial?.feDesiredCoverage|| '0').replace(/\D/g, '')) || 0
+  const income      = parseInt(String(financial?.income            || '0').replace(/\D/g, '')) || 0
+  const mortgage    = parseInt(String(financial?.mortgageBalance   || '0').replace(/\D/g, '')) || 0
+  const feDesired   = parseInt(String(financial?.feDesiredCoverage || '0').replace(/\D/g, '')) || 0
+  const disposition = financial?.finalDisposition || ''
   const age         = parseInt(clientInfo?.age) || 55
 
   // MORTGAGE PROTECTION — always use the actual mortgage balance. No income multiplier.
@@ -174,20 +187,18 @@ function getRecommendedFace(leadType, financial, clientInfo) {
     return mortgage > 0 ? mortgage : 250000
   }
 
-  // FINAL EXPENSE — use what the client says they want, capped $5k–$35k.
-  // Fall back to age-based default if no amount entered.
-  if (leadType === 'final_expense') {
-    if (feDesired > 0) {
-      return Math.min(Math.max(feDesired, 5000), 35000)
-    }
-    // Age-based default (no income multiplier)
+  // FINAL EXPENSE & VETERAN — identical burial/final expense coverage rules.
+  // Disposition takes precedence; fall back to agent-entered amount or age default.
+  if (leadType === 'final_expense' || leadType === 'veteran') {
+    if (disposition && DISPOSITION_FACE[disposition]) return DISPOSITION_FACE[disposition]
+    if (feDesired > 0) return Math.min(Math.max(feDesired, 5000), 35000)
     if (age >= 80) return 7500
     if (age >= 75) return 10000
     if (age >= 65) return 15000
     return 20000
   }
 
-  // VETERAN / TERM LIFE — income replacement: monthly income × 120 = 10 years of annual income
+  // MORTGAGE PROTECTION term fallback — income replacement
   return Math.min(income > 0 ? income * 120 : 150000, 500000)
 }
 
@@ -232,6 +243,8 @@ export function runUnderwriting(formData, agentContractLevel) {
     tobacco     = false,
     tobaccoType = '',
   } = clientInfo
+
+  const finalDisposition = financial?.finalDisposition || ''
 
   const clientAge = parseInt(ageStr) || 55
 
@@ -385,6 +398,7 @@ export function runUnderwriting(formData, agentContractLevel) {
         keyAdvantages:   carrier.keyAdvantages || [],
         tobaccoRule:     carrier.tobaccoRule   || null,
         waitingPeriod:   chosen.waitingPeriod  ?? 0,
+        tierOverride:    DISPOSITION_TIER_OVERRIDE[finalDisposition] || null,
       })
     }
 
