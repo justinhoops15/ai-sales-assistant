@@ -2,6 +2,7 @@ import { useState } from 'react'
 import AgentSetup          from './components/AgentSetup.jsx'
 import Clients             from './components/Clients.jsx'
 import Dashboard           from './components/Dashboard.jsx'
+import Earnings            from './components/Earnings.jsx'
 import FollowUp            from './components/FollowUp.jsx'
 import FollowUpModal       from './components/FollowUpModal.jsx'
 import ProgressBar         from './components/ProgressBar.jsx'
@@ -90,6 +91,8 @@ export default function App() {
   const [showDashboard,    setShowDashboard]    = useState(true)
   const [showClients,      setShowClients]      = useState(false)
   const [showFollowUps,    setShowFollowUps]    = useState(false)
+  const [showEarnings,     setShowEarnings]     = useState(false)
+  const [highlightClientId, setHighlightClientId] = useState(null)
   const [step,             setStep]             = useState(1)
   const [formData,         setFormData]         = useState(initForm)
   const [results,          setResults]          = useState(null)
@@ -477,13 +480,26 @@ export default function App() {
     allGraded2,
   } : null
 
-  const sidebarActiveView  = showFollowUps ? 'followups' : showClients ? 'clients' : showDashboard ? 'dashboard' : 'appointment'
+  const sidebarActiveView  = showFollowUps ? 'followups' : showEarnings ? 'earnings' : showClients ? 'clients' : showDashboard ? 'dashboard' : 'appointment'
   const sidebarCurrentStep = (!showDashboard && !showClients && !showFollowUps && appScreen === null && step >= 1) ? step : null
 
   function handleGoToClients() {
     setShowClients(true)
     setShowDashboard(false)
     setShowFollowUps(false)
+    setShowEarnings(false)
+    setHighlightClientId(null)
+    setAppScreen(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Called when user clicks a dot on the Dashboard chart — navigate to client card
+  function handleClientClick(clientId) {
+    setHighlightClientId(clientId)
+    setShowClients(true)
+    setShowDashboard(false)
+    setShowFollowUps(false)
+    setShowEarnings(false)
     setAppScreen(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -506,10 +522,33 @@ export default function App() {
   }
 
   function handleSidebarNavigate(view) {
-    if (view === 'dashboard')   { setShowDashboard(true);  setShowClients(false); setShowFollowUps(false); setAppScreen(null) }
-    if (view === 'clients')     { setShowClients(true);    setShowDashboard(false); setShowFollowUps(false); setAppScreen(null) }
-    if (view === 'followups')   { setShowFollowUps(true);  setShowDashboard(false); setShowClients(false);  setAppScreen(null) }
+    if (view === 'dashboard')   { setShowDashboard(true);  setShowClients(false); setShowFollowUps(false); setShowEarnings(false); setAppScreen(null) }
+    if (view === 'clients')     { setShowClients(true);    setShowDashboard(false); setShowFollowUps(false); setShowEarnings(false); setHighlightClientId(null); setAppScreen(null) }
+    if (view === 'followups')   { setShowFollowUps(true);  setShowDashboard(false); setShowClients(false);  setShowEarnings(false); setAppScreen(null) }
+    if (view === 'earnings')    { setShowEarnings(true);   setShowDashboard(false); setShowClients(false);  setShowFollowUps(false); setAppScreen(null) }
     if (view === 'appointment') { handleNewAppointment() }
+  }
+
+  // ── Earnings ───────────────────────────────────────────────────────────────
+  if (showEarnings && appScreen === null) {
+    return (
+      <div className="app">
+        <Sidebar
+          agentInfo={agentInfo}
+          activeView={sidebarActiveView}
+          currentStep={sidebarCurrentStep}
+          onNavigate={handleSidebarNavigate}
+          onChangeAgent={handleChangeAgent}
+          followUpCount={followUpCount}
+        />
+        <div className="app-body">
+          <AppHeader title="Earnings" agentInfo={agentInfo} onChangeAgent={handleChangeAgent} />
+          <main className="app-main">
+            <Earnings onGoToClients={handleGoToClients} />
+          </main>
+        </div>
+      </div>
+    )
   }
 
   // ── Follow Up page ─────────────────────────────────────────────────────────
@@ -553,7 +592,12 @@ export default function App() {
         <div className="app-body">
           <AppHeader title="Clients" agentInfo={agentInfo} onChangeAgent={handleChangeAgent} />
           <main className="app-main">
-            <Clients onEdit={handleEditClient} onNewAppointment={handleNewAppointment} />
+            <Clients
+              onEdit={handleEditClient}
+              onNewAppointment={handleNewAppointment}
+              highlightClientId={highlightClientId}
+              onHighlightClear={() => setHighlightClientId(null)}
+            />
           </main>
         </div>
       </div>
@@ -580,6 +624,7 @@ export default function App() {
               onNewAppointment={handleNewAppointment}
               onChangeAgent={handleChangeAgent}
               onGoToClients={handleGoToClients}
+              onClientClick={handleClientClick}
             />
           </main>
         </div>

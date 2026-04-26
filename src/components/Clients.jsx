@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 
 const LEAD_LABELS = {
   mortgage_protection: 'Mortgage Protection',
@@ -286,13 +286,29 @@ function ChargebackModal({ record, onConfirm, onCancel }) {
 }
 
 /* ── Main Clients Page ───────────────────────────────────────────────────── */
-export default function Clients({ onEdit, onNewAppointment }) {
+export default function Clients({ onEdit, onNewAppointment, highlightClientId, onHighlightClear }) {
   const [appointments,   setAppointments]   = useState(loadAppointments)
   const [chargebacks,    setChargebacks]    = useState(loadChargebacks)
   const [search,         setSearch]         = useState('')
   const [sortKey,        setSortKey]        = useState('most_recent')
   const [cbTarget,       setCbTarget]       = useState(null)  // record to chargeback
   const [deleteTarget,   setDeleteTarget]   = useState(null)  // record to delete (confirm)
+
+  // Scroll to highlighted card when navigated from Dashboard chart dot
+  useEffect(() => {
+    if (!highlightClientId) return
+    const el = document.getElementById(`client-card-${highlightClientId}`)
+    if (el) {
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('client-card-highlight')
+        setTimeout(() => {
+          el.classList.remove('client-card-highlight')
+          onHighlightClear?.()
+        }, 2500)
+      }, 150)
+    }
+  }, [highlightClientId, onHighlightClear])
 
   // Build chargeback lookup: clientId → chargeback record
   const cbMap = useMemo(() => {
@@ -484,14 +500,15 @@ export default function Clients({ onEdit, onNewAppointment }) {
       ) : (
         <div className="clients-grid">
           {sorted.map(record => (
-            <ClientCard
-              key={record.id}
-              record={record}
-              chargeback={cbMap[record.id] || null}
-              onEdit={onEdit}
-              onDelete={handleDelete}
-              onChargeback={handleChargeback}
-            />
+            <div key={record.id} id={`client-card-${record.id}`}>
+              <ClientCard
+                record={record}
+                chargeback={cbMap[record.id] || null}
+                onEdit={onEdit}
+                onDelete={handleDelete}
+                onChargeback={handleChargeback}
+              />
+            </div>
           ))}
         </div>
       )}

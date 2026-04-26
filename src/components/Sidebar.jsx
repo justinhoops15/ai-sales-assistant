@@ -45,6 +45,15 @@ function IconFollowUp() {
   )
 }
 
+function IconEarnings() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="8" y1="1" x2="8" y2="15"/>
+      <path d="M11 3.5H6.5A2.5 2.5 0 004 6v0a2.5 2.5 0 002.5 2.5h3A2.5 2.5 0 0112 11v0a2.5 2.5 0 01-2.5 2.5H4"/>
+    </svg>
+  )
+}
+
 function IconCheck() {
   return (
     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -98,6 +107,14 @@ export default function Sidebar({ agentInfo, activeView, currentStep, onNavigate
           {followUpCount > 0 && (
             <span className="sidebar-badge">{followUpCount}</span>
           )}
+        </button>
+
+        <button
+          onClick={() => onNavigate('earnings')}
+          className={`sidebar-item${activeView === 'earnings' ? ' active' : ''}`}
+        >
+          <span className="sidebar-item-icon"><IconEarnings /></span>
+          Earnings
         </button>
 
         {/* Step tracker */}

@@ -450,7 +450,7 @@ function ApptColumn({ title, items, onNew }) {
 }
 
 // ── Main Dashboard ──────────────────────────────────────────────────────────
-export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, onGoToClients }) {
+export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, onGoToClients, onClientClick }) {
   const [chartFilter,  setChartFilter]  = useState('all')
   const [tooltip,      setTooltip]      = useState(null)
   const [showApptForm, setShowApptForm] = useState(false)
@@ -604,8 +604,14 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
             <div className="db-dot-layer">
               {pts.map((pt, i) => (
                 <div key={i} className="db-dot"
-                  style={{ left: `${(pt.x / CW) * 100}%`, top: `${(pt.y / CH) * 100}%` }}
+                  style={{
+                    left: `${(pt.x / CW) * 100}%`,
+                    top:  `${(pt.y / CH) * 100}%`,
+                    cursor: onClientClick ? 'pointer' : 'default',
+                  }}
                   onMouseEnter={e => handleDotEnter(e, pt)}
+                  onClick={() => onClientClick && pt.appt?.id && onClientClick(pt.appt.id)}
+                  title={onClientClick ? `View ${pt.appt?.clientName || 'client'} in Clients` : undefined}
                 />
               ))}
             </div>
