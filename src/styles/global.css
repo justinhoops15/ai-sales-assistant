@@ -3365,6 +3365,7 @@ textarea.field-input {
    EARNINGS PAGE — earn- prefix
    ══════════════════════════════════════════════════════════════════════════ */
 
+/* ── Root ── */
 .earn-root {
   max-width: 1120px;
   margin: 0 auto;
@@ -3882,3 +3883,128 @@ textarea.field-input {
   font-weight: 700;
   color: #e05c5c;
 }
+
+/* ── Net Earnings note ── */
+.earn-net-note {
+  font-size: 11px;
+  color: #444444;
+  margin-top: 12px;
+  line-height: 1.55;
+  font-style: italic;
+}
+
+/* ── Chargebacked tag in expanded policy list ── */
+.earn-cb-tag {
+  color: #e05c5c;
+  font-weight: 700;
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+/* ── Production chart (full-featured) ── */
+.earn-prod-outer {
+  position: relative;
+  width: 100%;
+  height: 155px;
+  margin-bottom: 4px;
+}
+.earn-prod-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  overflow: visible;
+}
+.earn-prod-dot-layer {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+.earn-prod-dot {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  pointer-events: all;
+}
+
+/* Floating tooltip */
+.earn-graph-tooltip {
+  position: absolute;
+  background: rgba(8,8,8,0.97);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 7px;
+  padding: 8px 12px;
+  pointer-events: none;
+  z-index: 20;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+.earn-gtt-label { font-size: 10px; color: #666666; margin-bottom: 3px; }
+.earn-gtt-val   { font-size: 14px; font-weight: 700; color: #ffffff; }
+
+/* Stats grid (6-cell 3-col, below each chart) */
+.earn-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 7px;
+  overflow: hidden;
+  margin-top: 14px;
+}
+.earn-stat-cell {
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.015);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.earn-stat-cell-val {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+.earn-stat-cell-label {
+  font-size: 10px;
+  color: #555555;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+}
+
+/* Production graphs row (replaces old earn-graphs-grid) */
+.earn-graphs-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.earn-graphs-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* Team plan placeholder */
+.earn-graph-placeholder {
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+}
+.earn-placeholder-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+  gap: 8px;
+}
+.earn-placeholder-title { font-size: 13px; font-weight: 600; color: #444444; }
+.earn-placeholder-sub   { font-size: 11px; color: #383838; line-height: 1.5; }

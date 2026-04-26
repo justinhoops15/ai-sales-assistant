@@ -481,7 +481,7 @@ export default function App() {
   } : null
 
   const sidebarActiveView  = showFollowUps ? 'followups' : showEarnings ? 'earnings' : showClients ? 'clients' : showDashboard ? 'dashboard' : 'appointment'
-  const sidebarCurrentStep = (!showDashboard && !showClients && !showFollowUps && appScreen === null && step >= 1) ? step : null
+  const sidebarCurrentStep = (!showDashboard && !showClients && !showFollowUps && !showEarnings && appScreen === null && step >= 1) ? step : null
 
   function handleGoToClients() {
     setShowClients(true)
