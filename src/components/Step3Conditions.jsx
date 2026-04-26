@@ -1,4 +1,12 @@
-const TIME_BASED = new Set(['Heart Attack', 'Stroke/TIA', 'Cancer (non-skin)'])
+const TIME_BASED = new Set([
+  'Heart Attack', 'Stroke/TIA', 'Cancer (non-skin)',
+  // Specific cancer types — all get the same timeframe selector
+  'Leukemia', 'Lymphoma', "Hodgkin's Disease", "Non-Hodgkin's Lymphoma",
+  'Breast Cancer', 'Colon Cancer', 'Prostate Cancer', 'Lung Cancer',
+  'Skin Cancer (Melanoma)', 'Cervical Cancer', 'Ovarian Cancer',
+  'Bladder Cancer', 'Kidney Cancer', 'Thyroid Cancer', 'Pancreatic Cancer',
+  'Liver Cancer', 'Brain Tumor', 'Multiple Myeloma', 'Bone Cancer', 'Throat Cancer',
+])
 
 const TIMEFRAME_OPTIONS = [
   { value: '6mo',   label: 'Within 6 months' },

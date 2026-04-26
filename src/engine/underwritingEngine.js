@@ -113,6 +113,17 @@ const MED_CARRIER_MAP = {
   north_american:    'PROS',
 }
 
+// ── Specific cancer types → fall back to "Cancer (non-skin)" underwriting rules ─
+// Rather than adding 20 entries to every carrier's rule array, we detect any
+// specific cancer condition here and look up the carrier's "Cancer (non-skin)" rule.
+const SPECIFIC_CANCER_CONDITIONS = new Set([
+  'Leukemia', 'Lymphoma', "Hodgkin's Disease", "Non-Hodgkin's Lymphoma",
+  'Breast Cancer', 'Colon Cancer', 'Prostate Cancer', 'Lung Cancer',
+  'Skin Cancer (Melanoma)', 'Cervical Cancer', 'Ovarian Cancer',
+  'Bladder Cancer', 'Kidney Cancer', 'Thyroid Cancer', 'Pancreatic Cancer',
+  'Liver Cancer', 'Brain Tumor', 'Multiple Myeloma', 'Bone Cancer', 'Throat Cancer',
+])
+
 // ── AM Best ratings ───────────────────────────────────────────────────────────
 const AM_BEST = {
   TRANS: 'A+', AMER: 'A', AMAM: 'A', MOO: 'A+',
@@ -260,7 +271,11 @@ export function runUnderwriting(formData, agentContractLevel) {
     // ── 1. Knockout check ────────────────────────────────────────────────
     let declineReason = null
     for (const { name } of selectedConditions) {
-      const isKO = carrier.knockouts?.some(ko => ko.toLowerCase() === name.toLowerCase())
+      // Specific cancer types also match "Cancer (non-skin)" knockouts
+      const koName = SPECIFIC_CANCER_CONDITIONS.has(name) ? 'Cancer (non-skin)' : name
+      const isKO = carrier.knockouts?.some(ko =>
+        ko.toLowerCase() === name.toLowerCase() || ko.toLowerCase() === koName.toLowerCase()
+      )
       if (isKO) { declineReason = `Knockout condition: ${name}`; break }
     }
     if (declineReason) {
@@ -281,7 +296,9 @@ export function runUnderwriting(formData, agentContractLevel) {
     const flags       = []
     let worstTierRank = 0
     for (const { name: condName, value: condValue } of selectedConditions) {
-      const rule = carrier.conditions?.find(c => c.condition.toLowerCase() === condName.toLowerCase())
+      // Specific cancer types fall back to "Cancer (non-skin)" carrier rule
+      const lookupName = SPECIFIC_CANCER_CONDITIONS.has(condName) ? 'Cancer (non-skin)' : condName
+      const rule = carrier.conditions?.find(c => c.condition.toLowerCase() === lookupName.toLowerCase())
       if (!rule) continue
 
       let decision

@@ -388,6 +388,9 @@ export default function App() {
   }
 
   function handleSaveFollowUp({ note, priority, nextContactDate }) {
+    // Capture context before resetting — determines where to return after save
+    const returnToFollowUps = cancelContext === 'followups'
+
     try {
       const existing = JSON.parse(localStorage.getItem('follow_up_appointments') || '[]')
       const newNote  = { date: new Date().toISOString(), text: note || '' }
@@ -450,9 +453,10 @@ export default function App() {
     setShowFollowUp(false)
     setActiveFollowUpId(null)
     setCancelContext('dashboard')
-    setShowDashboard(true)
+    // Return to Follow Up section if that's where the agent came from; otherwise Dashboard
+    setShowFollowUps(returnToFollowUps)
+    setShowDashboard(!returnToFollowUps)
     setShowClients(false)
-    setShowFollowUps(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
