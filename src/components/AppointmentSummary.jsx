@@ -12,10 +12,11 @@ function fmt(n) {
   return '$' + Math.round(n).toLocaleString()
 }
 
-function saveAppointment({ application, clientName, formData, agentInfo, editingClientId }) {
+function saveAppointment({ application, clientName, formData, agentInfo, editingClientId, apptSessionId }) {
   const { rec, face } = application
   const record = {
     id:               Date.now(),
+    apptSessionId:    apptSessionId || null,
     savedAt:          new Date().toISOString(),
     agentName:        agentInfo?.name   || '',
     agentLevel:       agentInfo?.contractLevel || '',
@@ -92,35 +93,42 @@ export default function AppointmentSummary({
   formData,
   agentInfo,
   editingClientId,
+  apptSessionId,
   onBack,
-  onNewAppointment,
+  onGoToClients,
   onSaveToFollowUp,
 }) {
   const { rec, face } = application
   const client = formData.clientInfo
 
-  const [saved,            setSaved]            = useState(false)
-  const [saveTime,         setSaveTime]         = useState(null)
   const [showFollowUpModal, setShowFollowUpModal] = useState(false)
 
+  // Advance commission: monthly × commPct/100 × 9 (non-Ethos) or × 12 (Ethos)
+  // Must match exactly what Clients card and Earnings Commission Earned show.
+  const isEthos       = rec.carrierId === 'ETHOS'
+  const advanceMonths = isEthos ? 12 : 9
+  const advanceComm   = (application.monthlyPremium && rec.commissionPct != null)
+    ? Math.round(parseFloat(application.monthlyPremium) * (rec.commissionPct / 100) * advanceMonths)
+    : null
+
+  // Mark as Sold gate — both fields must be present before saving
+  const hasMonthlyPremium = parseFloat(application.monthlyPremium || 0) > 0
+  const hasDateEnforced   = /^\d{2}\/\d{2}\/\d{4}$/.test(application.dateEnforced || '')
+  const canSell           = hasMonthlyPremium && hasDateEnforced
+
   function handleMarkSold() {
-    saveAppointment({ application, clientName, formData, agentInfo, editingClientId })
-    setSaved(true)
-    setSaveTime(new Date().toLocaleTimeString())
+    if (!canSell) return
+    saveAppointment({ application, clientName, formData, agentInfo, editingClientId, apptSessionId })
+    // Navigate immediately to Clients — agent should never sit on summary after completing
+    onGoToClients()
   }
 
   return (
     <div className="animate-in" style={{ maxWidth: 960, margin: '0 auto', width: '100%' }}>
       <div className="step-header">
         <div className="step-eyebrow">Appointment Summary</div>
-        <h1 className="step-title">
-          {saved ? 'Marked as Sold' : 'Pre-Approved Summary'}
-        </h1>
-        <p className="step-subtitle">
-          {saved
-            ? `Appointment saved at ${saveTime}. Great work!`
-            : 'Review all details, then print or mark as sold.'}
-        </p>
+        <h1 className="step-title">Pre-Approved Summary</h1>
+        <p className="step-subtitle">Review all details, then print, mark as sold, or save for follow-up.</p>
       </div>
 
       {/* Printable summary card */}
@@ -175,11 +183,11 @@ export default function AppointmentSummary({
               {application.monthlyPremium && (
                 <Row label="Monthly Premium"    value={`$${parseFloat(application.monthlyPremium).toFixed(2)}`} accent />
               )}
-              <Row label="Commission Rate"      value={rec.commissionPct != null ? `${rec.commissionPct}%` : '—'} accent />
-              {application.monthlyPremium && rec.commissionPct != null && (
+              <Row label="Commission Rate" value={rec.commissionPct != null ? `${rec.commissionPct}%` : '—'} accent />
+              {advanceComm != null && (
                 <Row
-                  label="Agent 1st Year Earnings"
-                  value={`$${Math.round(parseFloat(application.monthlyPremium) * 12 * (rec.commissionPct / 100)).toLocaleString()}`}
+                  label={`Advanced Agent Commission (×${advanceMonths} mo${isEthos ? ' — Ethos' : ''})`}
+                  value={`$${advanceComm.toLocaleString()}`}
                   success
                 />
               )}
@@ -246,35 +254,33 @@ export default function AppointmentSummary({
             </>
           )}
 
-          {/* Saved indicator */}
-          {saved && (
-            <div style={{
-              marginTop: 20, padding: '12px 16px',
-              background: 'rgba(76,175,132,0.08)', border: '1px solid rgba(76,175,132,0.25)',
-              borderRadius: 8, textAlign: 'center', fontSize: 13, color: '#4caf84', fontWeight: 600,
-            }}>
-              Saved to appointment history at {saveTime}
-            </div>
-          )}
+          {/* No saved indicator — agent is navigated away immediately on Mark as Sold */}
         </div>
       </div>
 
-      {/* Actions */}
+      {/* Actions — Mark as Sold navigates to Clients; Save to Follow Up navigates to Follow Up */}
       <div className="step-actions">
         <button className="btn btn-secondary" onClick={onBack}>Back</button>
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           <button className="btn btn-ghost" onClick={() => window.print()}>Print Summary</button>
-          {!saved && (
-            <>
-              <button className="btn btn-followup" onClick={() => setShowFollowUpModal(true)}>
-                Save to Follow Up
-              </button>
-              <button className="btn btn-success" onClick={handleMarkSold}>
-                Mark as Sold
-              </button>
-            </>
-          )}
-          <button className="btn btn-primary" onClick={onNewAppointment}>New Appointment</button>
+          <button className="btn btn-followup" onClick={() => setShowFollowUpModal(true)}>
+            Save to Follow Up
+          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+            <button
+              className="btn btn-success"
+              onClick={handleMarkSold}
+              disabled={!canSell}
+              style={!canSell ? { opacity: 0.38, cursor: 'not-allowed', pointerEvents: 'none' } : {}}
+            >
+              Mark as Sold
+            </button>
+            {!canSell && (
+              <span style={{ fontSize: 11, color: '#555555', textAlign: 'right', lineHeight: 1.4 }}>
+                Monthly Premium and Date Enforced are required to save.
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

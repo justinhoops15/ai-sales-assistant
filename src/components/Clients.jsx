@@ -95,14 +95,167 @@ function PersistenceTracker({ dateEnforced, chargebackMonth }) {
   )
 }
 
-/* ── Single Client Card ──────────────────────────────────────────────────── */
-function ClientCard({ record, chargeback, onDelete, onEdit, onChargeback }) {
-  const leadColor   = LEAD_COLORS[record.leadType] || LEAD_COLORS.final_expense
+/**
+ * Advance commission formula (must match Earnings calcCommission exactly):
+ *   Non-Ethos: monthly × commPct/100 × 9
+ *   Ethos:     monthly × commPct/100 × 12
+ *
+ * Verification example (per spec):
+ *   $100/mo, 70% comm, non-Ethos, chargeback at month 2
+ *   Total Advance  = 100 × 0.70 × 9  = $630
+ *   Already Earned = 100 × 0.70 × 2  = $140
+ *   Chargeback     = $630 - $140      = $490  (< $630, no cap needed)
+ *   Advanced Agent Commission on card = $630  ✓ matches Earnings
+ */
+function calcAdvanceComm(monthlyPrem, commPct, carrierId) {
+  const advMonths = carrierId === 'ETHOS' ? 12 : 9
+  return Math.round(monthlyPrem * (commPct / 100) * advMonths)
+}
+
+/**
+ * Chargeback amount owed:
+ *   totalAdvance  = monthly × commPct/100 × advanceMonths
+ *   alreadyEarned = monthly × commPct/100 × monthsInForce
+ *   owed          = totalAdvance - alreadyEarned  (capped at totalAdvance, min 0)
+ */
+function calcChargebackOwed(monthlyPrem, commPct, carrierId, monthsInForce) {
+  const advMonths   = carrierId === 'ETHOS' ? 12 : 9
+  const totalAdv    = monthlyPrem * (commPct / 100) * advMonths
+  const earned      = monthlyPrem * (commPct / 100) * monthsInForce
+  const owed        = Math.max(0, Math.min(totalAdv - earned, totalAdv))
+  return {
+    advanceMonths: advMonths,
+    totalAdvance:  Math.round(totalAdv),
+    alreadyEarned: Math.round(earned),
+    chargebackAmt: Math.round(owed),
+  }
+}
+
+/* ── Read-Only View Details Modal (chargebacked clients) ─────────────────── */
+function ClientViewDetailsModal({ record, chargeback, onClose }) {
   const monthlyPrem = parseFloat(record.monthlyPremium) || 0
-  const annualPrem  = monthlyPrem * 12
   const commPct     = record.commissionPct || 0
-  const annualComm  = Math.round(annualPrem * (commPct / 100))
-  const isCharged   = !!chargeback
+  const advComm     = calcAdvanceComm(monthlyPrem, commPct, record.carrierId)
+
+  function Item({ label, value }) {
+    if (!value && value !== 0) return null
+    return (
+      <div className="fu-details-item">
+        <span className="fu-details-item-label">{label}</span>
+        <span className="fu-details-item-val">{value}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="db-overlay" onClick={onClose}>
+      <div className="db-modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+
+        <div className="db-modal-head">
+          <h2 className="db-modal-title">{record.clientName || 'Unknown'}</h2>
+          <button className="db-modal-close" onClick={onClose}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+            </svg>
+          </button>
+        </div>
+
+        <div className="fu-details-body">
+
+          {/* Client Info */}
+          <div>
+            <div className="fu-details-section-label">Client Information</div>
+            <div className="fu-details-grid">
+              <Item label="Age"           value={record.clientAge} />
+              <Item label="Sex"           value={record.clientSex} />
+              <Item label="State"         value={record.clientState} />
+              <Item label="Date of Birth" value={record.clientDOB} />
+              <Item label="Phone"         value={record.clientPhone} />
+              <Item label="Lead Type"     value={LEAD_LABELS[record.leadType] || record.leadType} />
+              <Item label="Marital Status" value={record.maritalStatus} />
+              {record.spouseName && <Item label="Spouse"  value={record.spouseName} />}
+              <Item label="Tobacco"       value={record.tobacco ? 'Yes' : 'No'} />
+            </div>
+          </div>
+
+          {/* Policy Details */}
+          <div>
+            <div className="fu-details-section-label">Policy Details</div>
+            <div className="fu-details-grid">
+              <Item label="Carrier"       value={record.carrier} />
+              <Item label="Product"       value={record.product} />
+              {record.planCode && <Item label="Plan Code" value={record.planCode} />}
+              <Item label="Underwriting Tier" value={record.tier} />
+              <Item label="Coverage"      value={fmt(record.face)} />
+              <Item label="Monthly Premium" value={monthlyPrem ? `$${monthlyPrem.toFixed(2)}` : '—'} />
+              <Item label="Annual Premium"  value={monthlyPrem ? fmt(monthlyPrem * 12) : '—'} />
+              <Item label="Commission %"  value={commPct ? `${commPct}%` : '—'} />
+              <Item label="Adv. Agent Commission" value={advComm ? fmt(advComm) : '—'} />
+              <Item label="Date Enforced" value={record.dateEnforced} />
+              <Item label="Date Closed"   value={fmtDate(record.savedAt)} />
+            </div>
+          </div>
+
+          {/* Beneficiaries */}
+          {(record.beneficiaries || []).filter(b => b.name?.trim()).length > 0 && (
+            <div>
+              <div className="fu-details-section-label">
+                Beneficiaries ({record.beneficiaries.filter(b => b.name?.trim()).length})
+              </div>
+              <div className="fu-details-grid">
+                {record.beneficiaries.filter(b => b.name?.trim()).map((b, i) => (
+                  <div key={i} className="fu-details-item">
+                    <span className="fu-details-item-label">
+                      {i === 0 ? 'Primary' : `Beneficiary ${i + 1}`}
+                    </span>
+                    <span className="fu-details-item-val">
+                      {[b.name, b.relationship, record.beneficiaries.length > 1 ? `${b.percentage}%` : null]
+                        .filter(Boolean).join(' · ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Chargeback Record */}
+          {chargeback && (
+            <div>
+              <div className="fu-details-section-label" style={{ color: '#e05c5c' }}>
+                Chargeback Record
+              </div>
+              <div className="fu-details-grid">
+                <Item label="Date Recorded"       value={fmtDate(chargeback.chargebackedAt)} />
+                <Item label="Months in Force"     value={chargeback.monthsInForceAtChargeback ?? chargeback.monthAtChargeback} />
+                {chargeback.totalAdvance != null && (
+                  <Item label="Total Advance Paid" value={fmt(chargeback.totalAdvance)} />
+                )}
+                {chargeback.alreadyEarned != null && (
+                  <Item label="Already Earned"    value={fmt(chargeback.alreadyEarned)} />
+                )}
+                <Item label="Amount Owed Back"   value={chargeback.chargebackAmount != null ? `−${fmt(chargeback.chargebackAmount)}` : '—'} />
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        <div style={{ padding: '14px 24px 20px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="db-btn-cancel" style={{ minWidth: 100 }} onClick={onClose}>Close</button>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
+/* ── Single Client Card ──────────────────────────────────────────────────── */
+function ClientCard({ record, chargeback, onDelete, onEdit, onChargeback, onViewDetails }) {
+  const leadColor    = LEAD_COLORS[record.leadType] || LEAD_COLORS.final_expense
+  const monthlyPrem  = parseFloat(record.monthlyPremium) || 0
+  const commPct      = record.commissionPct || 0
+  const advanceComm  = calcAdvanceComm(monthlyPrem, commPct, record.carrierId)
+  const isCharged    = !!chargeback
   const chargebackMonth = chargeback?.monthAtChargeback ?? null
 
   return (
@@ -142,17 +295,17 @@ function ClientCard({ record, chargeback, onDelete, onEdit, onChargeback }) {
         </div>
         <div className="client-metric">
           <div className="client-metric-label">Monthly Premium</div>
-          <div className="client-metric-value client-metric-accent">
+          <div className="client-metric-value" style={{ color: '#7c3aed' }}>
             {monthlyPrem ? `$${monthlyPrem.toFixed(2)}` : '—'}
           </div>
         </div>
         <div className="client-metric">
           <div className="client-metric-label">Annual Premium</div>
-          <div className="client-metric-value">{annualPrem ? fmt(annualPrem) : '—'}</div>
+          <div className="client-metric-value">{monthlyPrem ? fmt(monthlyPrem * 12) : '—'}</div>
         </div>
         <div className="client-metric">
-          <div className="client-metric-label">Agent Commission</div>
-          <div className="client-metric-value client-metric-success">{annualComm ? fmt(annualComm) : '—'}</div>
+          <div className="client-metric-label">Advanced Agent Commission</div>
+          <div className="client-metric-value" style={{ color: '#22d3ee' }}>{advanceComm ? fmt(advanceComm) : '—'}</div>
         </div>
       </div>
 
@@ -193,12 +346,25 @@ function ClientCard({ record, chargeback, onDelete, onEdit, onChargeback }) {
 
       {/* Actions */}
       <div className="client-card-actions">
-        <button className="client-action-btn client-action-edit" onClick={() => onEdit(record)}>
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9.5 1.5l2 2L4 11H2v-2L9.5 1.5Z"/>
-          </svg>
-          Edit
-        </button>
+        {isCharged ? (
+          /* Chargebacked: View Details (read-only) replaces Edit */
+          <button className="fu-action-btn fu-btn-view" onClick={() => onViewDetails(record)}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="6.5" cy="6.5" r="5.5"/>
+              <line x1="6.5" y1="4.5" x2="6.5" y2="7.5"/>
+              <circle cx="6.5" cy="9" r="0.5" fill="currentColor"/>
+            </svg>
+            View Details
+          </button>
+        ) : (
+          /* Not chargebacked: normal Edit button */
+          <button className="client-action-btn client-action-edit" onClick={() => onEdit(record)}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9.5 1.5l2 2L4 11H2v-2L9.5 1.5Z"/>
+            </svg>
+            Edit
+          </button>
+        )}
         {!isCharged && (
           <button className="client-action-btn client-action-cb" onClick={() => onChargeback(record)}>
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
@@ -226,16 +392,26 @@ function ClientCard({ record, chargeback, onDelete, onEdit, onChargeback }) {
 
 /* ── Chargeback Confirm Modal ─────────────────────────────────────────────── */
 function ChargebackModal({ record, onConfirm, onCancel }) {
-  const monthsInForce   = calcMonthsInForce(record.dateEnforced)
-  const monthlyPrem     = parseFloat(record.monthlyPremium) || 0
-  const commPct         = record.commissionPct || 0
-  const remainingMonths = Math.max(0, 12 - monthsInForce)
-  const chargebackAmt   = Math.round(remainingMonths * monthlyPrem * (commPct / 100))
-  const chargebackMonth = monthsInForce + 1 // the month at which chargeback hits
+  const monthsInForce = calcMonthsInForce(record.dateEnforced)
+  const monthlyPrem   = parseFloat(record.monthlyPremium) || 0
+  const commPct       = record.commissionPct || 0
+  const carrierId     = record.carrierId || ''
+  const chargebackMonth = monthsInForce + 1 // first month that turns red in persistence tracker
+
+  // ── Correct 3-step advance chargeback formula ──────────────────────────
+  // Step 1: total advance deposited into agent's bank account
+  const advanceMonths = carrierId === 'ETHOS' ? 12 : 9
+  const totalAdvance  = Math.round(monthlyPrem * (commPct / 100) * advanceMonths)
+
+  // Step 2: amount the agent already legitimately earned before chargeback
+  const alreadyEarned = Math.round(monthlyPrem * (commPct / 100) * monthsInForce)
+
+  // Step 3: what the agent must pay back (capped at totalAdvance, floor 0)
+  const chargebackAmt = Math.max(0, Math.min(totalAdvance - alreadyEarned, totalAdvance))
 
   return (
     <div className="db-overlay" onClick={onCancel}>
-      <div className="db-modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+      <div className="db-modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
         <div className="db-modal-head">
           <h2 className="db-modal-title">Record Chargeback</h2>
           <button className="db-modal-close" onClick={onCancel}>
@@ -245,36 +421,61 @@ function ChargebackModal({ record, onConfirm, onCancel }) {
           </button>
         </div>
         <div style={{ padding: '20px 24px 24px' }}>
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 14, color: '#888888', marginBottom: 12, lineHeight: 1.6 }}>
-              Recording a chargeback for <strong style={{ color: '#ffffff' }}>{record.clientName}</strong>.
-              The policy has been in force for <strong style={{ color: '#22d3ee' }}>{monthsInForce}</strong> of 12 months.
+          <div style={{ fontSize: 14, color: '#888888', marginBottom: 16, lineHeight: 1.6 }}>
+            Recording a chargeback for{' '}
+            <strong style={{ color: '#ffffff' }}>{record.clientName}</strong>.
+            Policy has been in force for{' '}
+            <strong style={{ color: '#22d3ee' }}>{monthsInForce}</strong> month{monthsInForce !== 1 ? 's' : ''}.
+          </div>
+
+          <div className="cb-calc-grid">
+            {/* Step 1 */}
+            <div className="cb-calc-section-label">Step 1 — Total Advance Paid</div>
+            <div className="cb-calc-row">
+              <span>Monthly premium</span><span>${monthlyPrem.toFixed(2)}</span>
             </div>
-            <div className="cb-calc-grid">
-              <div className="cb-calc-row">
-                <span>Months in force</span><span>{monthsInForce}</span>
-              </div>
-              <div className="cb-calc-row">
-                <span>Remaining months</span><span>{remainingMonths}</span>
-              </div>
-              <div className="cb-calc-row">
-                <span>Monthly premium</span><span>${monthlyPrem.toFixed(2)}</span>
-              </div>
-              <div className="cb-calc-row">
-                <span>Commission rate</span><span>{commPct}%</span>
-              </div>
-              <div className="cb-calc-row cb-calc-total">
-                <span>Est. amount owed back</span>
-                <span className="cb-calc-total-val">{fmt(chargebackAmt)}</span>
-              </div>
+            <div className="cb-calc-row">
+              <span>Commission rate</span><span>{commPct}%</span>
+            </div>
+            <div className="cb-calc-row">
+              <span>Advance period ({carrierId === 'ETHOS' ? 'Ethos — 12 mo' : '9 mo'})</span>
+              <span>× {advanceMonths}</span>
+            </div>
+            <div className="cb-calc-row cb-calc-subtotal">
+              <span>Total advance paid</span>
+              <span style={{ color: '#22d3ee' }}>{fmt(totalAdvance)}</span>
+            </div>
+
+            {/* Step 2 */}
+            <div className="cb-calc-section-label" style={{ marginTop: 10 }}>Step 2 — Already Earned</div>
+            <div className="cb-calc-row">
+              <span>Months in force</span><span>{monthsInForce}</span>
+            </div>
+            <div className="cb-calc-row cb-calc-subtotal">
+              <span>Already earned</span>
+              <span style={{ color: '#4caf84' }}>{fmt(alreadyEarned)}</span>
+            </div>
+
+            {/* Step 3 */}
+            <div className="cb-calc-row cb-calc-total" style={{ marginTop: 10 }}>
+              <span>Amount owed back</span>
+              <span className="cb-calc-total-val">{fmt(chargebackAmt)}</span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
             <button className="db-btn-cancel" style={{ flex: 1 }} onClick={onCancel}>Cancel</button>
             <button
               className="db-btn-save"
               style={{ flex: 2, background: 'rgba(224,92,92,0.15)', borderColor: 'rgba(224,92,92,0.4)', color: '#e05c5c' }}
-              onClick={() => onConfirm({ chargebackMonth, remainingMonths, chargebackAmt })}
+              onClick={() => onConfirm({
+                chargebackMonth,
+                monthsInForce,
+                advanceMonths,
+                totalAdvance,
+                alreadyEarned,
+                chargebackAmt,
+              })}
             >
               Confirm Chargeback
             </button>
@@ -293,6 +494,19 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
   const [sortKey,        setSortKey]        = useState('most_recent')
   const [cbTarget,       setCbTarget]       = useState(null)  // record to chargeback
   const [deleteTarget,   setDeleteTarget]   = useState(null)  // record to delete (confirm)
+  const [viewTarget,     setViewTarget]     = useState(null)  // chargebacked record to view (read-only)
+
+  // Escape key closes any open modal
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.key !== 'Escape') return
+      if (viewTarget)   setViewTarget(null)
+      if (cbTarget)     setCbTarget(null)
+      if (deleteTarget) setDeleteTarget(null)
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [viewTarget, cbTarget, deleteTarget])
 
   // Scroll to highlighted card when navigated from Dashboard chart dot
   useEffect(() => {
@@ -328,7 +542,7 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
     )
   }, [appointments, search])
 
-  // Sort
+  // Sort / filter
   const sorted = useMemo(() => {
     const arr = [...filtered]
     switch (sortKey) {
@@ -345,7 +559,7 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
           const mA = calcMonthsInForce(a.dateEnforced)
           const mB = calcMonthsInForce(b.dateEnforced)
           if (mB !== mA) return mB - mA
-          return new Date(a.savedAt) - new Date(b.savedAt) // tie: oldest first
+          return new Date(a.savedAt) - new Date(b.savedAt)
         })
       }
       case 'least_months': {
@@ -353,12 +567,21 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
           const mA = calcMonthsInForce(a.dateEnforced)
           const mB = calcMonthsInForce(b.dateEnforced)
           if (mA !== mB) return mA - mB
-          return new Date(a.savedAt) - new Date(b.savedAt) // tie: oldest first
+          return new Date(a.savedAt) - new Date(b.savedAt)
         })
       }
+      case 'chargebacks':
+        // Show only chargebacked clients, ordered by most recent chargeback date
+        return arr
+          .filter(r => !!cbMap[r.id])
+          .sort((a, b) => {
+            const aDate = cbMap[a.id]?.chargebackedAt || a.savedAt
+            const bDate = cbMap[b.id]?.chargebackedAt || b.savedAt
+            return new Date(bDate) - new Date(aDate)
+          })
       default: return arr
     }
-  }, [filtered, sortKey])
+  }, [filtered, sortKey, cbMap])
 
   function handleDelete(record) {
     setDeleteTarget(record)
@@ -379,17 +602,22 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
     setCbTarget(record)
   }
 
-  function confirmChargeback({ chargebackMonth, remainingMonths, chargebackAmt }) {
+  function confirmChargeback({ chargebackMonth, monthsInForce, advanceMonths, totalAdvance, alreadyEarned, chargebackAmt }) {
     const newCB = {
-      id:                Date.now(),
-      clientId:          cbTarget.id,
-      clientName:        cbTarget.clientName,
-      chargebackedAt:    new Date().toISOString(),
-      monthAtChargeback: chargebackMonth,
-      remainingMonths,
-      chargebackAmount:  chargebackAmt,
-      monthlyPremium:    cbTarget.monthlyPremium,
-      commissionPct:     cbTarget.commissionPct,
+      id:                        Date.now(),
+      clientId:                  cbTarget.id,
+      clientName:                cbTarget.clientName,
+      carrier:                   cbTarget.carrier   || '',
+      carrierId:                 cbTarget.carrierId || '',
+      chargebackedAt:            new Date().toISOString(),
+      monthAtChargeback:         chargebackMonth,
+      monthsInForceAtChargeback: monthsInForce,
+      advanceMonths,
+      monthlyPremium:            cbTarget.monthlyPremium,
+      commissionPct:             cbTarget.commissionPct,
+      totalAdvance,
+      alreadyEarned,
+      chargebackAmount:          chargebackAmt,
     }
     const updated = chargebacks.filter(cb => cb.clientId !== cbTarget.id)
     updated.push(newCB)
@@ -427,11 +655,11 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
             <div className="clients-stat-label">Policies Sold</div>
           </div>
           <div className="clients-stat">
-            <div className="clients-stat-num">{fmt(totalAnnualPremium)}</div>
+            <div className="clients-stat-num" style={{ color: '#4caf84' }}>{fmt(totalAnnualPremium)}</div>
             <div className="clients-stat-label">Total Annual Premium</div>
           </div>
           <div className="clients-stat">
-            <div className="clients-stat-num" style={{ color: '#4caf84' }}>{fmt(totalCommission)}</div>
+            <div className="clients-stat-num" style={{ color: '#22d3ee' }}>{fmt(totalCommission)}</div>
             <div className="clients-stat-label">Total 1st-Year Commission</div>
           </div>
           <div className="clients-stat">
@@ -470,6 +698,7 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
           <option value="lowest_premium">Lowest Annual Premium</option>
           <option value="most_months">Most Months in Force</option>
           <option value="least_months">Least Months in Force</option>
+          <option value="chargebacks">Chargebacks</option>
         </select>
       </div>
 
@@ -507,6 +736,7 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
                 onEdit={onEdit}
                 onDelete={handleDelete}
                 onChargeback={handleChargeback}
+                onViewDetails={setViewTarget}
               />
             </div>
           ))}
@@ -551,6 +781,15 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
           record={cbTarget}
           onConfirm={confirmChargeback}
           onCancel={() => setCbTarget(null)}
+        />
+      )}
+
+      {/* View Details modal — read-only, shown on chargebacked cards */}
+      {viewTarget && (
+        <ClientViewDetailsModal
+          record={viewTarget}
+          chargeback={cbMap[viewTarget.id] || null}
+          onClose={() => setViewTarget(null)}
         />
       )}
     </div>

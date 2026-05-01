@@ -221,43 +221,46 @@ option { background: #050505; color: #ffffff; }
 .sidebar-change-btn:hover { color: #888888; }
 
 /* ── Header ────────────────────────────────────────────────────────────── */
-.app-header {
-  height: var(--header-h);
-  background: #000000;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+/* ── Header bar removed (Fix 3) — space background fills entire page ─────── */
+.app-header { display: none; }
+
+/* ── Floating Agent Badge (Fix 3) ──────────────────────────────────────────── */
+.floating-agent-badge {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 32px;
-  position: sticky;
-  top: 0;
-  z-index: 50;
+  align-self: flex-end;
+  margin: 20px 24px 0;
+  gap: 10px;
+  padding: 7px 14px 7px 12px;
+  background: rgba(8,8,8,0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 24px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
 }
 
-.header-page-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.header-agent {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.agent-name-tag {
-  font-size: 13px;
-  color: #888888;
-}
-
-.agent-level-tag {
+.fab-agency {
   font-size: 11px;
-  padding: 3px 10px;
+  color: #555555;
+  padding-right: 8px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+
+.fab-name {
+  font-size: 12px;
+  color: #888888;
+  font-weight: 500;
+}
+
+.fab-level {
+  font-size: 11px;
+  padding: 2px 9px;
   border-radius: 20px;
-  background: rgba(124, 58, 237, 0.15);
-  border: 1px solid rgba(124, 58, 237, 0.3);
+  background: rgba(124,58,237,0.15);
+  border: 1px solid rgba(124,58,237,0.3);
   color: #a78bfa;
+  font-weight: 600;
 }
 
 /* ── Progress Bar ──────────────────────────────────────────────────────── */
@@ -621,8 +624,15 @@ option { background: #050505; color: #ffffff; }
 
 /* ── Follow-Up Modal ─────────────────────────────────────────────────────── */
 .followup-modal {
-  width: 100%;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 502;
+  width: calc(100% - 40px);
   max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
   background: #080808;
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 14px;
@@ -1401,8 +1411,8 @@ textarea.field-input {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* ── Print ─────────────────────────────────────────────────────────────── */
@@ -1432,11 +1442,6 @@ textarea.field-input {
 
 /* ── Page header ───────────────────────────────────────────────────────── */
 .db-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  flex-wrap: wrap;
   margin-bottom: 24px;
 }
 
@@ -1461,30 +1466,52 @@ textarea.field-input {
 .db-subtitle {
   font-size: 13px;
   color: #555555;
+  margin-bottom: 0;
+}
+
+/* Legacy — no longer used */
+.db-cta-row    { display: none; }
+.db-header-cta { display: none; }
+
+/* Button row: same grid as db-stat-row so col widths match exactly */
+.db-stat-btn-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;        /* must equal db-stat-row gap */
+  margin-bottom: 8px;
+}
+
+/* Button auto-placed in 4th column, full column width */
+.db-cta-stat {
+  grid-column: 4;
+  width: 100%;
+  justify-content: center;
 }
 
 .db-cta {
   display: inline-flex;
   align-items: center;
-  padding: 10px 22px;
-  background: rgba(124,58,237,0.15);
-  border: 1px solid rgba(124,58,237,0.35);
+  gap: 6px;
+  padding: 9px 16px;
+  background: rgba(124,58,237,0.18);
+  border: 1px solid rgba(124,58,237,0.4);
   border-radius: 8px;
   color: #a78bfa;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;
-  align-self: flex-start;
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+  letter-spacing: 0.01em;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease,
+              box-shadow 150ms ease;
 }
 
 .db-cta:hover {
-  background: rgba(124,58,237,0.25);
-  border-color: rgba(124,58,237,0.55);
+  background: rgba(124,58,237,0.28);
+  border-color: rgba(124,58,237,0.6);
   color: #c4b5fd;
+  box-shadow: 0 0 18px rgba(124,58,237,0.2);
 }
 
 /* ── Stat cards row ────────────────────────────────────────────────────── */
@@ -1610,7 +1637,29 @@ textarea.field-input {
   transform: translate(-50%, -50%) scale(1.3);
 }
 
-/* Chart empty state */
+/* Chart empty overlay — shown over graph skeleton when no data for period */
+.db-chart-wrap-empty {
+  pointer-events: none;
+}
+
+.db-chart-empty-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  pointer-events: none;
+}
+
+.db-chart-empty-overlay-text {
+  font-size: 12px;
+  color: #3a3a3a;
+  letter-spacing: 0.02em;
+}
+
+/* Chart empty state (legacy — kept for safety) */
 .db-chart-empty {
   padding: 48px 24px;
   text-align: center;
@@ -1822,12 +1871,7 @@ textarea.field-input {
   margin-bottom: 16px;
 }
 
-.db-agents-card {
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
+/* .db-agents-card is now defined below with overlay support (Fix 8) */
 
 .db-agents-eyebrow {
   font-size: 10px;
@@ -1921,41 +1965,422 @@ textarea.field-input {
   margin-top: 4px;
 }
 
-/* ── Footer ────────────────────────────────────────────────────────────── */
-.db-footer {
-  padding: 6px 0 12px;
+/* ── Footer (hidden — Fix 9) ────────────────────────────────────────────── */
+.db-footer { display: none; }
+
+/* ── Fix 4: Chart + Appointments Stats side-by-side row ─────────────────── */
+.db-chart-appt-row {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+  align-items: stretch;
 }
+
+/* Appointments Stats Panel */
+.db-appt-stats-panel {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.db-appt-stats-head {
+  margin-bottom: 18px;
+}
+
+.db-appt-stats-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.db-appt-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.db-appt-filter-pill {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: transparent;
+  color: #555555;
+  transition: all 150ms ease;
+}
+
+.db-appt-filter-pill:hover {
+  border-color: rgba(124,58,237,0.3);
+  color: #a78bfa;
+}
+
+.db-appt-filter-pill.active {
+  background: rgba(124,58,237,0.18);
+  border-color: rgba(124,58,237,0.45);
+  color: #a78bfa;
+}
+
+.db-appt-stats-boxes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  justify-content: center;
+}
+
+.db-appt-stat-box {
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 8px;
+}
+
+.db-appt-stat-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.db-appt-stat-label {
+  font-size: 11px;
+  color: #444444;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 500;
+}
+
+/* ── Fix 6: Unified Calendar View ──────────────────────────────────────── */
+.db-calendar-view {
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.db-cal-view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.db-cal-view-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #cccccc;
+}
+
+.db-cal-view-pills {
+  display: flex;
+  gap: 5px;
+}
+
+.db-cal-view-pill {
+  padding: 4px 11px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: transparent;
+  color: #555555;
+  transition: all 150ms ease;
+}
+
+.db-cal-view-pill:hover {
+  border-color: rgba(124,58,237,0.3);
+  color: #a78bfa;
+}
+
+.db-cal-view-pill.active {
+  background: rgba(124,58,237,0.18);
+  border-color: rgba(124,58,237,0.45);
+  color: #a78bfa;
+}
+
+/* Calendar connect buttons */
+.db-cal-connects {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.db-cal-connect-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  color: #555555;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: not-allowed;
+  transition: all 150ms ease;
+}
+
+.db-cal-connect-btn:hover {
+  border-color: rgba(255,255,255,0.1);
+  color: #666666;
+}
+
+.db-cal-connect-icon { opacity: 0.5; }
+
+.db-cal-connect-label { font-weight: 500; }
+
+.db-cal-connect-tag {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: rgba(124,58,237,0.08);
+  border: 1px solid rgba(124,58,237,0.2);
+  color: #6b4fa0;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* Calendar event list */
+.db-cal-event-list {
+  margin-bottom: 14px;
+}
+
+.db-cal-event-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.db-cal-event-item:last-child { border-bottom: none; }
+
+.db-cal-event-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: #22d3ee;
+  min-width: 68px;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.db-cal-event-date {
+  font-size: 10px;
+  color: #444444;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.db-cal-event-body { flex: 1; min-width: 0; }
+
+.db-cal-event-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #cccccc;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-cal-event-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.db-cal-loc-tag {
+  font-size: 10px;
+  color: #444444;
+  padding: 1px 6px;
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 4px;
+}
+
+/* ── Fix 8: Active Agents In Downline with overlay ──────────────────────── */
+.db-agents-card {
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.db-agents-plan-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: inherit;
+}
+
+.db-agents-plan-lock {
+  color: #444444;
+  opacity: 0.7;
+}
+
+.db-agents-plan-text {
+  font-size: 11px;
+  color: #555555;
+  text-align: center;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+/* ── Fade-in keyframe (shared) ─────────────────────────────────────────── */
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* ── Appointment Flow Overlay (90vw × 90vh) ────────────────────────────── */
+.apmt-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 450;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: overlayFadeIn 150ms ease;
+}
+
+.apmt-modal {
+  width: 90vw;
+  height: 90vh;
+  background: #0d0d0d;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 32px 100px rgba(0,0,0,0.7);
+  animation: modalSlideIn 180ms ease;
+}
+
+.apmt-modal-top {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.apmt-modal-top-inner {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Override progress-wrapper margin when inside modal top */
+.apmt-modal-top .progress-wrapper {
+  margin-bottom: 0;
+}
+
+.apmt-screen-label {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  padding: 14px 0;
+}
+
+.apmt-close-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  color: #666666;
+  cursor: pointer;
+  transition: all 140ms ease;
+  margin-bottom: 12px;
+}
+
+.apmt-close-btn:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.14);
+  color: #cccccc;
+}
+
+.apmt-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+}
+
+/* Scrollbar inside modal body */
+.apmt-modal-body::-webkit-scrollbar { width: 5px; }
+.apmt-modal-body::-webkit-scrollbar-track { background: transparent; }
+.apmt-modal-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+.apmt-modal-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
 
 /* ── New Appointment Modal ─────────────────────────────────────────────── */
 .db-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.72);
+  background: rgba(0,0,0,0.6);
   z-index: 500;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 40px 20px 40px;
-  overflow-y: auto;
+  animation: overlayFadeIn 150ms ease;
 }
 
 .db-modal {
-  width: 100%;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 501;
+  width: calc(100% - 40px);
   max-width: 520px;
-  background: #050505;
+  background: #0d0d0d;
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: 0 24px 80px rgba(0,0,0,0.6);
   overflow: hidden;
-  flex-shrink: 0;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .db-modal-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px 18px;
+  padding: 24px 24px 18px;
   border-bottom: 1px solid rgba(255,255,255,0.07);
+  position: sticky;
+  top: 0;
+  background: #0d0d0d;
+  z-index: 2;
 }
 
 .db-modal-title {
@@ -2136,6 +2561,46 @@ textarea.field-input {
   background: rgba(124,58,237,0.32);
   border-color: rgba(124,58,237,0.65);
   color: #c4b5fd;
+}
+
+/* ── Nav Warning Modal Buttons ──────────────────────────────────────────── */
+.nav-warn-stay {
+  flex: 1;
+  padding: 11px 20px;
+  background: #7c3aed;
+  border: 1px solid #7c3aed;
+  border-radius: 7px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.nav-warn-stay:hover {
+  background: #6d28d9;
+  border-color: #6d28d9;
+}
+
+.nav-warn-leave {
+  flex: 1;
+  padding: 11px 20px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 7px;
+  color: #cccccc;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.nav-warn-leave:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.18);
+  color: #ffffff;
 }
 
 /* Appointment item time/location labels */
@@ -2636,7 +3101,23 @@ textarea.field-input {
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 8px;
   overflow: hidden;
-  margin-bottom: 20px;
+  margin-bottom: 4px;
+}
+
+/* Section heading inside the calc grid (Step 1, Step 2, etc.) */
+.cb-calc-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #444444;
+  font-weight: 600;
+  padding: 8px 14px 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+/* Subtotal row — slightly elevated bg */
+.cb-calc-subtotal {
+  background: rgba(255,255,255,0.03);
 }
 
 .cb-calc-row {
@@ -2684,8 +3165,8 @@ textarea.field-input {
 
 .db-stat-link-hint {
   font-size: 11px;
-  color: #22d3ee;
-  opacity: 0.7;
+  color: #7c3aed;
+  opacity: 0.85;
   margin-top: 4px;
   display: block;
 }
@@ -3450,14 +3931,14 @@ textarea.field-input {
   margin-bottom: 4px;
 }
 .earn-stat-title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #888888;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 .earn-stat-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: #555555;
   margin-top: 2px;
 }
@@ -3519,7 +4000,22 @@ textarea.field-input {
 }
 .earn-detail-row:last-child { border-bottom: none; }
 .earn-detail-key   { color: #888888; }
-.earn-detail-carrier { color: #555555; font-size: 11px; }
+.earn-detail-carrier {
+  color: #555555;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+.earn-detail-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  background: transparent;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
 .earn-detail-val   { font-weight: 600; flex-shrink: 0; }
 .earn-cb-date      { color: #555555; font-size: 11px; }
 
@@ -3571,7 +4067,7 @@ textarea.field-input {
   grid-template-columns: 1fr 220px 220px;
   gap: 12px;
   margin-bottom: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 
 /* Goal Card */
@@ -3585,7 +4081,7 @@ textarea.field-input {
   margin-bottom: 16px;
 }
 .earn-section-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: #888888;
   text-transform: uppercase;
@@ -3693,6 +4189,8 @@ textarea.field-input {
   flex-direction: column;
   align-items: center;
   text-align: center;
+  align-self: stretch;
+  justify-content: center;
 }
 .earn-circle-wrap { display: flex; flex-direction: column; align-items: center; }
 .earn-circle-label {
@@ -3733,7 +4231,7 @@ textarea.field-input {
   padding: 18px 18px 14px;
 }
 .earn-graph-label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -3779,15 +4277,16 @@ textarea.field-input {
   margin-bottom: 12px;
 }
 .earn-cb-logo {
-  width: 44px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   object-fit: contain;
-  filter: brightness(0.85);
+  background: transparent;
   flex-shrink: 0;
+  border-radius: 4px;
 }
 .earn-cb-logo-fallback {
-  width: 44px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   background: rgba(255,255,255,0.05);
   border-radius: 4px;
   display: flex;
@@ -3850,33 +4349,37 @@ textarea.field-input {
   gap: 8px;
 }
 .earn-cb-record {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 6px 12px;
-  align-items: center;
-  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
   background: rgba(255,255,255,0.02);
   border: 1px solid rgba(255,255,255,0.04);
   border-radius: 6px;
 }
+.earn-cb-record-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
 .earn-cb-record-name {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #cccccc;
-  grid-column: 1;
 }
 .earn-cb-record-meta {
-  font-size: 10px;
+  font-size: 11px;
   color: #555555;
-  grid-column: 1;
+  margin-top: 2px;
 }
 .earn-cb-record-right {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  grid-column: 2;
-  grid-row: 1 / 3;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .earn-cb-owed {
   font-size: 13px;
@@ -3905,7 +4408,7 @@ textarea.field-input {
 .earn-prod-outer {
   position: relative;
   width: 100%;
-  height: 155px;
+  height: 300px;
   margin-bottom: 4px;
 }
 .earn-prod-svg {
@@ -3964,12 +4467,12 @@ textarea.field-input {
   gap: 2px;
 }
 .earn-stat-cell-val {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1;
 }
 .earn-stat-cell-label {
-  font-size: 10px;
+  font-size: 11px;
   color: #555555;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -4008,3 +4511,272 @@ textarea.field-input {
 }
 .earn-placeholder-title { font-size: 13px; font-weight: 600; color: #444444; }
 .earn-placeholder-sub   { font-size: 11px; color: #383838; line-height: 1.5; }
+
+/* ── Payment buttons in CB tracker ── */
+.earn-cb-pay-full-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 5px;
+  border: 1px solid rgba(76,175,132,0.3);
+  background: rgba(76,175,132,0.08);
+  color: #4caf84;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 140ms ease;
+}
+.earn-cb-pay-full-btn:hover {
+  background: rgba(76,175,132,0.18);
+  border-color: rgba(76,175,132,0.5);
+}
+.earn-cb-pay-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #888888;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 140ms ease;
+}
+.earn-cb-pay-btn:hover {
+  background: rgba(255,255,255,0.08);
+  color: #cccccc;
+}
+
+/* Inline payment history chips below each CB record */
+.earn-cb-pay-history-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.earn-cb-pay-chip {
+  font-size: 10px;
+  color: #555555;
+  background: rgba(76,175,132,0.06);
+  border: 1px solid rgba(76,175,132,0.12);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+/* ── Payment Modal internals ── */
+.earn-pay-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+}
+.earn-pay-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.earn-pay-summary-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555555;
+}
+.earn-pay-summary-val {
+  font-size: 16px;
+  font-weight: 700;
+}
+.earn-pay-history {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 8px;
+}
+.earn-pay-history-head {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #555555;
+  margin-bottom: 8px;
+}
+.earn-pay-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.earn-pay-history-row:last-child {
+  border-bottom: none;
+}
+.earn-pay-history-date { font-size: 12px; color: #888888; }
+.earn-pay-history-amt  { font-size: 13px; font-weight: 600; }
+.earn-pay-mode-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.earn-pay-mode-btn {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color: #666666;
+  cursor: pointer;
+  transition: all 140ms ease;
+  text-align: center;
+}
+.earn-pay-mode-btn:hover {
+  background: rgba(255,255,255,0.07);
+  color: #aaaaaa;
+}
+.earn-pay-mode-btn.active {
+  background: rgba(34,211,238,0.1);
+  border-color: rgba(34,211,238,0.35);
+  color: #22d3ee;
+}
+.earn-pay-note {
+  font-size: 11px;
+  color: #444444;
+  line-height: 1.55;
+  font-style: italic;
+  margin-bottom: 4px;
+}
+.earn-pay-resolved-note {
+  font-size: 13px;
+  color: #4caf84;
+  text-align: center;
+  padding: 14px;
+  background: rgba(76,175,132,0.06);
+  border: 1px solid rgba(76,175,132,0.15);
+  border-radius: 8px;
+  line-height: 1.55;
+}
+
+/* ── Per-row edit / delete in EditPaymentsModal ── */
+.earn-pay-edit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.earn-pay-edit-row:last-child {
+  border-bottom: none;
+}
+.earn-pay-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.earn-pay-edit-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #888888;
+  cursor: pointer;
+  transition: all 130ms ease;
+  white-space: nowrap;
+}
+.earn-pay-edit-btn:hover {
+  background: rgba(255,255,255,0.09);
+  color: #cccccc;
+  border-color: rgba(255,255,255,0.18);
+}
+.earn-pay-delete-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 5px;
+  border: 1px solid rgba(224,92,92,0.2);
+  background: rgba(224,92,92,0.06);
+  color: #e05c5c;
+  cursor: pointer;
+  transition: all 130ms ease;
+  white-space: nowrap;
+}
+.earn-pay-delete-btn:hover {
+  background: rgba(224,92,92,0.15);
+  border-color: rgba(224,92,92,0.4);
+}
+
+/* Inline edit input row */
+.earn-pay-inline-edit {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.earn-pay-edit-dollar {
+  font-size: 13px;
+  color: #666666;
+  flex-shrink: 0;
+}
+.earn-pay-inline-input {
+  width: 90px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(34,211,238,0.35);
+  border-radius: 5px;
+  color: #ffffff;
+  outline: none;
+}
+.earn-pay-inline-input:focus {
+  border-color: rgba(34,211,238,0.65);
+  background: rgba(34,211,238,0.06);
+}
+.earn-pay-inline-save {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid rgba(34,211,238,0.35);
+  background: rgba(34,211,238,0.1);
+  color: #22d3ee;
+  cursor: pointer;
+  transition: all 130ms ease;
+  white-space: nowrap;
+}
+.earn-pay-inline-save:hover {
+  background: rgba(34,211,238,0.2);
+  border-color: rgba(34,211,238,0.55);
+}
+.earn-pay-inline-cancel {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: transparent;
+  color: #555555;
+  cursor: pointer;
+  transition: all 130ms ease;
+}
+.earn-pay-inline-cancel:hover {
+  color: #888888;
+  border-color: rgba(255,255,255,0.15);
+}
+
+/* "No payments yet" state in history block */
+.earn-pay-empty {
+  font-size: 12px;
+  color: #444444;
+  padding: 10px 0;
+  font-style: italic;
+}
+
+/* Add payment section wrapper */
+.earn-pay-add-section {
+  margin-bottom: 14px;
+}

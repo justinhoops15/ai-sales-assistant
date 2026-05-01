@@ -354,17 +354,34 @@ export function runUnderwriting(formData, agentContractLevel) {
       }
 
       // ── 6. Commission ────────────────────────────────────────────────
+      // Primary lookup: product-specific rate from COMP_GRID via PROD_TO_COMP mapping.
+      // This ensures an agent at e.g. 70% base earns the actual product rate (e.g. 65%
+      // on Eagle Premier rather than their base 70%). The looked-up rate is saved to
+      // localStorage at submission time for permanent historical accuracy.
       let commissionPct = null
       const compMap = PROD_TO_COMP[chosen.id]
       if (compMap) commissionPct = getComp(compMap.c, compMap.p, agentContractLevel)
       if (commissionPct == null) {
+        // Fallback: no PROD_TO_COMP mapping or product not in COMP_GRID for this level.
+        // Use the first product listed for this carrier as a best approximation.
+        console.warn(
+          `[FFL Commission] No product-specific rate found for product "${chosen.id}" ` +
+          `(carrier ${carrierId}) at contract level ${agentContractLevel}%. ` +
+          `Falling back to carrier first-product rate.`
+        )
         const compCarrier = COMP_GRID[carrierId]
         if (compCarrier) {
           const firstProd = Object.values(compCarrier)[0]
           commissionPct = firstProd?.[agentContractLevel] ?? null
         }
+        if (commissionPct == null) {
+          console.warn(
+            `[FFL Commission] Carrier fallback also failed for ${carrierId} at level ` +
+            `${agentContractLevel}%. Commission will display as null.`
+          )
+        }
       }
-      // Age-based override: Ethos TruStage Advantage WL
+      // Age-based override: Ethos TruStage Advantage WL commission varies by client age.
       if (chosen.id === 'TRUSTAGE_TAWL') {
         commissionPct = (clientAge >= 60 && clientAge <= 80) ? 72.5 : 39.5
       }

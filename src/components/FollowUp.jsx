@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const LEAD_LABELS = {
@@ -506,6 +506,17 @@ export default function FollowUp({ onResumeFollowUp, onNewAppointment, onCountCh
   const [deleteTarget, setDeleteTarget] = useState(null)
 
   const stats = useMemo(() => computeStats(records), [records])
+
+  // Escape key closes any open modal
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.key !== 'Escape') return
+      if (viewTarget)   setViewTarget(null)
+      if (deleteTarget) setDeleteTarget(null)
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [viewTarget, deleteTarget])
 
   const STAT_BOXES = [
     { key: 'overdue', label: 'Overdue',  value: stats.overdue, cls: 'fu-stat-overdue' },

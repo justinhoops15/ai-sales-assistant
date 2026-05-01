@@ -49,9 +49,34 @@ const FILTER_OPTS = [
   { key: 'all',   label: 'All Time' },
 ]
 
+const APPT_FILTER_OPTS = [
+  { key: 'day',   label: 'Day'      },
+  { key: 'week',  label: 'Week'     },
+  { key: 'month', label: 'Month'    },
+  { key: 'year',  label: 'Year'     },
+  { key: 'all',   label: 'All Time' },
+]
+
+const CAL_FILTER_OPTS = [
+  { key: 'day',   label: 'Day'   },
+  { key: 'week',  label: 'Week'  },
+  { key: 'month', label: 'Month' },
+  { key: 'year',  label: 'Year'  },
+]
+
 // ── localStorage helpers ────────────────────────────────────────────────────
 function loadSoldAppts() {
   try { return JSON.parse(localStorage.getItem('ffl_appointments') || '[]') }
+  catch { return [] }
+}
+
+function loadFollowUpAppts() {
+  try { return JSON.parse(localStorage.getItem('follow_up_appointments') || '[]') }
+  catch { return [] }
+}
+
+function loadReachedResults() {
+  try { return JSON.parse(localStorage.getItem('all_appointments_reached_results') || '[]') }
   catch { return [] }
 }
 
@@ -88,6 +113,23 @@ function isApptThisWeek(appt) {
   return d >= weekStart && d < weekEnd
 }
 
+function isApptThisMonth(appt) {
+  if (!appt.date) return false
+  const d = new Date(appt.date + 'T00:00:00'), n = new Date()
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth()
+}
+
+function isApptThisYear(appt) {
+  if (!appt.date) return false
+  return new Date(appt.date + 'T00:00:00').getFullYear() === new Date().getFullYear()
+}
+
+function isIsoToday(iso) {
+  if (!iso) return false
+  const d = new Date(iso), n = new Date()
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
+}
+
 function isThisWeek(iso) {
   if (!iso) return false
   const d = new Date(iso)
@@ -113,6 +155,14 @@ function filterByPeriod(appts, period) {
   if (period === 'week')  return appts.filter(a => isThisWeek(a.savedAt))
   if (period === 'month') return appts.filter(a => isThisMonth(a.savedAt))
   if (period === 'year')  return appts.filter(a => isThisYear(a.savedAt))
+  return appts
+}
+
+function filterByApptPeriod(appts, period, key = 'savedAt') {
+  if (period === 'day')   return appts.filter(a => isIsoToday(a[key]))
+  if (period === 'week')  return appts.filter(a => isThisWeek(a[key]))
+  if (period === 'month') return appts.filter(a => isThisMonth(a[key]))
+  if (period === 'year')  return appts.filter(a => isThisYear(a[key]))
   return appts
 }
 
@@ -411,39 +461,156 @@ function NewApptModal({ onSave, onCancel }) {
   )
 }
 
-// ── Appointment Column ──────────────────────────────────────────────────────
-function ApptColumn({ title, items, onNew }) {
-  return (
-    <div className="db-glass db-appt-col">
-      <div className="db-appt-col-head">
-        <span className="db-appt-col-title">{title}</span>
-        <span className="db-appt-count">{items.length}</span>
-      </div>
+// ── Appointment Stats Panel (Fix 4) ─────────────────────────────────────────
+function AppointmentStatsPanel({ soldAppts, followUpAppts }) {
+  const [filter, setFilter] = useState('all')
 
-      {items.length === 0 ? (
-        <div className="db-appt-empty">No appointments {title.toLowerCase()}</div>
-      ) : (
-        <div className="db-appt-list">
-          {items.map((a, i) => (
-            <div key={a.id || i} className="db-appt-item">
-              <div className="db-appt-name">{a.name}</div>
-              <div className="db-appt-meta">
-                {a.date && (
-                  <span className="db-appt-time">
-                    {fmtApptDate(a.date)}{a.time ? ` · ${fmtTime(a.time)}` : ''}
-                  </span>
-                )}
-                {a.leadType  && <span className="db-mini-badge">{LEAD_LABELS[a.leadType] || a.leadType}</span>}
-                {a.location  && <span className="db-appt-loc">{a.location}</span>}
-              </div>
-            </div>
+  const filteredSold = useMemo(() => filterByApptPeriod(soldAppts, filter), [soldAppts, filter])
+  const filteredFU   = useMemo(() => filterByApptPeriod(followUpAppts, filter), [followUpAppts, filter])
+
+  const totalAppts  = filteredSold.length + filteredFU.length
+  const policiesSold = filteredSold.length
+  const followUpCnt  = filteredFU.length
+
+  return (
+    <div className="db-glass db-appt-stats-panel">
+      <div className="db-appt-stats-head">
+        <div className="db-appt-stats-title">Appointments</div>
+        <div className="db-appt-filter-pills">
+          {APPT_FILTER_OPTS.map(f => (
+            <button key={f.key}
+              className={`db-appt-filter-pill${filter === f.key ? ' active' : ''}`}
+              onClick={() => setFilter(f.key)}>
+              {f.label}
+            </button>
           ))}
         </div>
-      )}
-
-      <div className="db-cal-note">
-        Connect Google Calendar or Calendly to sync appointments automatically
       </div>
+
+      <div className="db-appt-stats-boxes">
+        <div className="db-appt-stat-box">
+          <div className="db-appt-stat-num">{totalAppts}</div>
+          <div className="db-appt-stat-label">Total Appointments</div>
+        </div>
+        <div className="db-appt-stat-box">
+          <div className="db-appt-stat-num" style={{ color: '#22d3ee' }}>{policiesSold}</div>
+          <div className="db-appt-stat-label">Policies Sold</div>
+        </div>
+        <div className="db-appt-stat-box">
+          <div className="db-appt-stat-num" style={{ color: '#a78bfa' }}>{followUpCnt}</div>
+          <div className="db-appt-stat-label">Follow Up</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Calendar View (Fix 6) ────────────────────────────────────────────────────
+const CAL_SERVICES = [
+  {
+    id: 'google',
+    label: 'Google Calendar',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'apple',
+    label: 'Apple Calendar',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        <circle cx="12" cy="16" r="2"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'calendly',
+    label: 'Calendly',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+    ),
+  },
+]
+
+function CalendarView({ scheduled, onNew }) {
+  const [calFilter, setCalFilter] = useState('week')
+
+  const filtered = useMemo(() => {
+    const sorted = [...scheduled].sort((a, b) => {
+      const ad = new Date(`${a.date || '9999-12-31'}T${a.time || '00:00'}`)
+      const bd = new Date(`${b.date || '9999-12-31'}T${b.time || '00:00'}`)
+      return ad - bd
+    })
+    if (calFilter === 'day')   return sorted.filter(a => isApptToday(a))
+    if (calFilter === 'week')  return sorted.filter(a => isApptThisWeek(a))
+    if (calFilter === 'month') return sorted.filter(a => isApptThisMonth(a))
+    if (calFilter === 'year')  return sorted.filter(a => isApptThisYear(a))
+    return sorted
+  }, [scheduled, calFilter])
+
+  return (
+    <div className="db-glass db-calendar-view">
+      {/* Header */}
+      <div className="db-cal-view-head">
+        <div className="db-cal-view-title">Schedule</div>
+        <div className="db-cal-view-pills">
+          {CAL_FILTER_OPTS.map(f => (
+            <button key={f.key}
+              className={`db-cal-view-pill${calFilter === f.key ? ' active' : ''}`}
+              onClick={() => setCalFilter(f.key)}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Connect buttons */}
+      <div className="db-cal-connects">
+        {CAL_SERVICES.map(svc => (
+          <button key={svc.id} className="db-cal-connect-btn" disabled title="Coming soon">
+            <span className="db-cal-connect-icon">{svc.icon}</span>
+            <span className="db-cal-connect-label">{svc.label}</span>
+            <span className="db-cal-connect-tag">Connect</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Event list */}
+      <div className="db-cal-event-list">
+        {filtered.length === 0 ? (
+          <div className="db-appt-empty" style={{ padding: '20px 0' }}>
+            No appointments {calFilter === 'day' ? 'today' : `this ${calFilter}`}
+          </div>
+        ) : (
+          filtered.map((a, i) => (
+            <div key={a.id || i} className="db-cal-event-item">
+              <div className="db-cal-event-time">
+                {a.time ? fmtTime(a.time) : <span style={{ color: '#333' }}>—</span>}
+                {a.date && <div className="db-cal-event-date">{fmtApptDate(a.date)}</div>}
+              </div>
+              <div className="db-cal-event-body">
+                <div className="db-cal-event-name">{a.name}</div>
+                <div className="db-cal-event-meta">
+                  {a.leadType && (
+                    <span className="db-mini-badge">{LEAD_LABELS[a.leadType] || a.leadType}</span>
+                  )}
+                  {a.location && (
+                    <span className="db-cal-loc-tag">{a.location}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       <button className="db-add-btn" onClick={onNew}>+ New Appointment</button>
     </div>
   )
@@ -457,12 +624,41 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
   const [scheduled,    setScheduled]    = useState(loadScheduled)
   const wrapRef = useRef(null)
 
-  // Stats / chart pull from sold appointments (ffl_appointments)
-  const soldAppts = useMemo(loadSoldAppts, [])
-  const total        = soldAppts.length
-  const thisWeekCnt  = soldAppts.filter(a => isThisWeek(a.savedAt)).length
-  const thisMonthCnt = soldAppts.filter(a => isThisMonth(a.savedAt)).length
-  const policiesSold = soldAppts.filter(a => a.monthlyPremium).length
+  // All sold appointments + follow-ups (for stats)
+  const soldAppts      = useMemo(loadSoldAppts, [])
+  const followUpAppts  = useMemo(loadFollowUpAppts, [])
+  const reachedResults = useMemo(loadReachedResults, [])
+
+  // Policies Sold = every record in ffl_appointments (all were marked as sold)
+  const policiesSold = soldAppts.length
+
+  // Total Appointments = unique appointment sessions that reached Step 7.
+  // Deduplication: collect all unique session IDs across the three stores.
+  // Records with apptSessionId use that as the key; historical records without one
+  // fall back to a prefixed store-specific ID so they're always counted distinctly.
+  const total = useMemo(() => {
+    const ids = new Set()
+    soldAppts.forEach(a =>
+      ids.add(a.apptSessionId || `ffl-${a.id}`)
+    )
+    followUpAppts.forEach(f =>
+      ids.add(f.apptSessionId || `fu-${f.id}`)
+    )
+    reachedResults.forEach(r =>
+      ids.add(r.sessionId)
+    )
+    return ids.size
+  }, [soldAppts, followUpAppts, reachedResults])
+
+  // Fix 5: All-time AP and commission
+  const agentLevel = agentInfo?.contractLevel ?? 100
+  const allTimeAP   = soldAppts.reduce((s, a) => s + (parseFloat(a.monthlyPremium) || 0) * 12, 0)
+  const allTimeComm = soldAppts.reduce((s, a) => {
+    const ap  = (parseFloat(a.monthlyPremium) || 0) * 12
+    const pct = (a.commissionPct > 0 ? a.commissionPct : agentLevel)
+    const fac = a.carrierId === 'ETHOS' ? 1 : 9 / 12
+    return s + ap * (pct / 100) * fac
+  }, 0)
 
   const chartData = useMemo(() =>
     filterByPeriod(soldAppts, chartFilter)
@@ -476,10 +672,8 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
   const maxAP = pts.length ? pts[0].maxAP : 5000
   const totalAP = chartData.reduce((s, a) => s + (parseFloat(a.monthlyPremium) || 0) * 12, 0)
 
-  // My Appointments pull from scheduled_appointments
+  // Scheduled appointments
   const futureAppts = scheduled.filter(isFuture)
-  const todayAppts  = futureAppts.filter(isApptToday)
-  const weekAppts   = futureAppts.filter(a => isApptThisWeek(a) && !isApptToday(a))
 
   // Recent clients from sold appointments
   const recent = [...soldAppts].reverse().slice(0, 5)
@@ -503,11 +697,12 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
     setShowApptForm(false)
   }
 
+  // Stat boxes with per-box colors (Fix 3)
   const STATS = [
-    { label: 'Total Appointments', value: total,        accent: false },
-    { label: 'This Week',          value: thisWeekCnt,  accent: false },
-    { label: 'This Month',         value: thisMonthCnt, accent: false },
-    { label: 'Policies Sold',      value: policiesSold, accent: true  },
+    { label: 'Total Appointments', value: total,            color: '#ffffff', clickable: false },
+    { label: 'Annual Premium',     value: fmt(allTimeAP),   color: '#4caf84', clickable: false },
+    { label: 'Commission Paid',    value: fmt(allTimeComm), color: '#22d3ee', clickable: false },
+    { label: 'Policies Sold',      value: policiesSold,     color: '#7c3aed', clickable: true  },
   ]
 
   return (
@@ -515,24 +710,26 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
 
       {/* ── Header ── */}
       <div className="db-header">
-        <div>
-          <div className="db-eyebrow">FFL Intelligence — Agent Dashboard</div>
-          <h1 className="db-title">Welcome back, {agentInfo.name.split(' ')[0]}</h1>
-          <p className="db-subtitle">
-            Contract level: {agentInfo.contractLevel}%
-            {' · '}
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </p>
-        </div>
-        <button className="db-cta" onClick={onNewAppointment}>
+        <div className="db-eyebrow">FFL Intelligence — Agent Dashboard</div>
+        <h1 className="db-title">Welcome back, {agentInfo.name.split(' ')[0]}</h1>
+        <p className="db-subtitle">
+          Contract level: {agentInfo.contractLevel}%
+          {' · '}
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        </p>
+      </div>
+
+      {/* ── Button row: same 4-column grid as stat row, button in col 4 only ── */}
+      <div className="db-stat-btn-row">
+        <button className="db-cta db-cta-stat" onClick={onNewAppointment}>
           + Start New Appointment
         </button>
       </div>
 
-      {/* ── Stat cards ── */}
+      {/* ── All 4 equal stat cards ── */}
       <div className="db-stat-row">
         {STATS.map(s => {
-          const isClickable = s.label === 'Policies Sold' && onGoToClients
+          const isClickable = s.clickable && onGoToClients
           return (
             <div
               key={s.label}
@@ -540,7 +737,7 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
               onClick={isClickable ? onGoToClients : undefined}
               title={isClickable ? 'View all clients' : undefined}
             >
-              <div className={`db-stat-num${s.accent ? ' db-stat-accent' : ''}`}>{s.value}</div>
+              <div className="db-stat-num" style={{ color: s.color }}>{s.value}</div>
               <div className="db-stat-label">{s.label}</div>
               {isClickable && <div className="db-stat-link-hint">View Clients →</div>}
             </div>
@@ -548,109 +745,129 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
         })}
       </div>
 
-      {/* ── Annual Premium chart ── */}
-      <div className="db-glass db-chart-card">
-        <div className="db-chart-head">
-          <div>
-            <div className="db-chart-title">Annual Premium</div>
-            {totalAP > 0 && <div className="db-chart-total">{fmt(totalAP)} total AP</div>}
-          </div>
-          <div className="db-pills">
-            {FILTER_OPTS.map(f => (
-              <button key={f.key}
-                className={`db-pill${chartFilter === f.key ? ' active' : ''}`}
-                onClick={() => setChartFilter(f.key)}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* ── Fix 4: Appointments stats + chart side by side ── */}
+      <div className="db-chart-appt-row">
 
-        {pts.length === 0 ? (
-          <div className="db-chart-empty">
-            <div className="db-chart-empty-icon">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-              </svg>
-            </div>
-            <div className="db-chart-empty-title">No sales recorded yet</div>
-            <div className="db-chart-empty-sub">
-              Complete appointments and mark as sold to see your premium chart
-            </div>
-          </div>
-        ) : (
-          <div className="db-chart-wrap" ref={wrapRef} onMouseLeave={() => setTooltip(null)}>
-            <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" className="db-chart-svg">
-              <defs>
-                <linearGradient id="dbAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor="#7c3aed" stopOpacity="0.28" />
-                  <stop offset="100%" stopColor="#7c3aed" stopOpacity="0"    />
-                </linearGradient>
-                <linearGradient id="dbLineGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%"   stopColor="#7c3aed" />
-                  <stop offset="100%" stopColor="#22d3ee" />
-                </linearGradient>
-              </defs>
-              <YLabels maxAP={maxAP} />
-              <line x1={PAD.left} y1={CH - PAD.bottom} x2={CW - PAD.right} y2={CH - PAD.bottom}
-                stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-              <path d={paths.area} fill="url(#dbAreaGrad)" />
-              <path d={paths.line} stroke="url(#dbLineGrad)" strokeWidth="2"
-                fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+        {/* Left: Appointment Stats Panel */}
+        <AppointmentStatsPanel soldAppts={soldAppts} followUpAppts={followUpAppts} />
 
-            {/* Dot overlay */}
-            <div className="db-dot-layer">
-              {pts.map((pt, i) => (
-                <div key={i} className="db-dot"
-                  style={{
-                    left: `${(pt.x / CW) * 100}%`,
-                    top:  `${(pt.y / CH) * 100}%`,
-                    cursor: onClientClick ? 'pointer' : 'default',
-                  }}
-                  onMouseEnter={e => handleDotEnter(e, pt)}
-                  onClick={() => onClientClick && pt.appt?.id && onClientClick(pt.appt.id)}
-                  title={onClientClick ? `View ${pt.appt?.clientName || 'client'} in Clients` : undefined}
-                />
+        {/* Right: Annual Premium chart */}
+        <div className="db-glass db-chart-card">
+          <div className="db-chart-head">
+            <div>
+              <div className="db-chart-title">Annual Premium</div>
+              {totalAP > 0 && <div className="db-chart-total">{fmt(totalAP)} total AP</div>}
+            </div>
+            <div className="db-pills">
+              {FILTER_OPTS.map(f => (
+                <button key={f.key}
+                  className={`db-pill${chartFilter === f.key ? ' active' : ''}`}
+                  onClick={() => setChartFilter(f.key)}>
+                  {f.label}
+                </button>
               ))}
             </div>
-
-            {/* Tooltip */}
-            {tooltip && (
-              <div className="db-tooltip" style={{
-                left: Math.min(tooltip.x, (wrapRef.current?.offsetWidth ?? 400) - 200),
-                top:  tooltip.y - 8,
-                transform: 'translate(-50%, -100%)',
-              }}>
-                <div className="db-tt-name">{tooltip.pt.appt.clientName || 'Unknown Client'}</div>
-                <div className="db-tt-row"><span>Carrier</span><span>{tooltip.pt.appt.carrier || '—'}</span></div>
-                {tooltip.pt.appt.planCode && (
-                  <div className="db-tt-row"><span>Product</span><span>{tooltip.pt.appt.planCode}</span></div>
-                )}
-                <div className="db-tt-row"><span>Coverage</span><span>{fmt(tooltip.pt.appt.face)}</span></div>
-                <div className="db-tt-row"><span>Monthly</span><span>${parseFloat(tooltip.pt.appt.monthlyPremium || 0).toFixed(2)}</span></div>
-                <div className="db-tt-ap"><span>Annual Premium</span><span>{fmt(tooltip.pt.ap)}</span></div>
-                <div className="db-tt-date">{fmtDate(tooltip.pt.appt.savedAt)}</div>
-              </div>
-            )}
           </div>
-        )}
+
+          {pts.length === 0 ? (
+            <div className="db-chart-wrap db-chart-wrap-empty" ref={wrapRef}>
+              <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" className="db-chart-svg">
+                <YLabels maxAP={5000} />
+                <line x1={PAD.left} y1={CH - PAD.bottom} x2={CW - PAD.right} y2={CH - PAD.bottom}
+                  stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                <line x1={PAD.left} y1={CH - PAD.bottom} x2={CW - PAD.right} y2={CH - PAD.bottom}
+                  stroke="rgba(34,211,238,0.15)" strokeWidth="2" strokeDasharray="8 5" />
+              </svg>
+              <div className="db-chart-empty-overlay">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ opacity: 0.25 }}>
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                </svg>
+                <span className="db-chart-empty-overlay-text">
+                  {chartFilter === 'week'  ? 'No sales recorded this week'  :
+                   chartFilter === 'month' ? 'No sales recorded this month' :
+                   chartFilter === 'year'  ? 'No sales recorded this year'  :
+                   'No sales recorded yet'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="db-chart-wrap" ref={wrapRef} onMouseLeave={() => setTooltip(null)}>
+              <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" className="db-chart-svg">
+                <defs>
+                  <linearGradient id="dbAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"   stopColor="#7c3aed" stopOpacity="0.28" />
+                    <stop offset="100%" stopColor="#7c3aed" stopOpacity="0"    />
+                  </linearGradient>
+                  <linearGradient id="dbLineGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%"   stopColor="#7c3aed" />
+                    <stop offset="100%" stopColor="#22d3ee" />
+                  </linearGradient>
+                </defs>
+                <YLabels maxAP={maxAP} />
+                <line x1={PAD.left} y1={CH - PAD.bottom} x2={CW - PAD.right} y2={CH - PAD.bottom}
+                  stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                <path d={paths.area} fill="url(#dbAreaGrad)" />
+                <path d={paths.line} stroke="url(#dbLineGrad)" strokeWidth="2"
+                  fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+
+              <div className="db-dot-layer">
+                {pts.map((pt, i) => (
+                  <div key={i} className="db-dot"
+                    style={{
+                      left: `${(pt.x / CW) * 100}%`,
+                      top:  `${(pt.y / CH) * 100}%`,
+                      cursor: onClientClick ? 'pointer' : 'default',
+                    }}
+                    onMouseEnter={e => handleDotEnter(e, pt)}
+                    onClick={() => onClientClick && pt.appt?.id && onClientClick(pt.appt.id)}
+                    title={onClientClick ? `View ${pt.appt?.clientName || 'client'} in Clients` : undefined}
+                  />
+                ))}
+              </div>
+
+              {tooltip && (
+                <div className="db-tooltip" style={{
+                  left: Math.min(tooltip.x, (wrapRef.current?.offsetWidth ?? 400) - 200),
+                  top:  tooltip.y - 8,
+                  transform: 'translate(-50%, -100%)',
+                }}>
+                  <div className="db-tt-name">{tooltip.pt.appt.clientName || 'Unknown Client'}</div>
+                  <div className="db-tt-row"><span>Carrier</span><span>{tooltip.pt.appt.carrier || '—'}</span></div>
+                  {tooltip.pt.appt.planCode && (
+                    <div className="db-tt-row"><span>Product</span><span>{tooltip.pt.appt.planCode}</span></div>
+                  )}
+                  <div className="db-tt-row"><span>Coverage</span><span>{fmt(tooltip.pt.appt.face)}</span></div>
+                  <div className="db-tt-row"><span>Monthly</span><span>${parseFloat(tooltip.pt.appt.monthlyPremium || 0).toFixed(2)}</span></div>
+                  <div className="db-tt-ap"><span>Annual Premium</span><span>{fmt(tooltip.pt.ap)}</span></div>
+                  <div className="db-tt-date">{fmtDate(tooltip.pt.appt.savedAt)}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── My Appointments ── */}
+      {/* ── Fix 6: Unified Calendar View ── */}
       <div className="db-section-heading">My Appointments</div>
-      <div className="db-appt-row">
-        <ApptColumn title="Today"     items={todayAppts} onNew={() => setShowApptForm(true)} />
-        <ApptColumn title="This Week" items={weekAppts}  onNew={() => setShowApptForm(true)} />
-      </div>
+      <CalendarView scheduled={futureAppts} onNew={() => setShowApptForm(true)} />
 
       {/* ── Bottom row ── */}
       <div className="db-bottom-row">
+
+        {/* Fix 8: Active Agents In Downline — no count shown, overlay only */}
         <div className="db-glass db-agents-card">
-          <div className="db-agents-eyebrow">Active Agents</div>
-          <div className="db-agents-num">1</div>
-          <div className="db-agents-sub">Multi-agent support coming soon</div>
+          <div className="db-agents-eyebrow">Active Agents In Downline</div>
+          <div className="db-agents-plan-overlay">
+            <span className="db-agents-plan-lock">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+              </svg>
+            </span>
+            <span className="db-agents-plan-text">Agency Plan Required</span>
+          </div>
         </div>
 
         <div className="db-glass db-recent-card">
@@ -682,12 +899,7 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
         </div>
       </div>
 
-      {/* ── Footer ── */}
-      <div className="db-footer">
-        <button className="dashboard-switch-btn" onClick={onChangeAgent}>
-          Switch agent profile
-        </button>
-      </div>
+      {/* Fix 9: No footer / switch agent button */}
 
       {/* ── New Appointment Modal ── */}
       {showApptForm && (

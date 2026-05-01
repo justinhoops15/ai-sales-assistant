@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
+import { CARRIER_LOGOS } from '../data/carrierLogos'
 
 // ── localStorage helpers ──────────────────────────────────────────────────────
 function loadAppointments() {
@@ -15,6 +16,9 @@ function loadGoals() {
     const s = localStorage.getItem('agent_goals')
     return s ? JSON.parse(s) : { weeklyAP: '', monthlyAP: '' }
   } catch { return { weeklyAP: '', monthlyAP: '' } }
+}
+function loadAgent() {
+  try { return JSON.parse(localStorage.getItem('ffl_agent') || '{}') } catch { return {} }
 }
 function saveGoals(g) {
   try { localStorage.setItem('agent_goals', JSON.stringify(g)) } catch {}
@@ -98,21 +102,6 @@ function filterPeriod(list, period, key = 'savedAt') {
   return list
 }
 
-// ── Carrier logo mapping ──────────────────────────────────────────────────────
-const CARRIER_LOGOS = {
-  AMER:  'americo.png',
-  TRANS: 'transamerica.png',
-  AMAM:  'american-amicable.png',
-  MOO:   'mutual-of-omaha.png',
-  FORE:  'foresters.png',
-  AETNA: 'aetna.png',
-  ETHOS: 'ethos.png',
-  JH:    'john-hancock.png',
-  CORE:  'corebridge.png',
-  PROS:  'prosperity.png',
-  NAFA:  'north-american.png',
-}
-
 // ── Persistency parsers ───────────────────────────────────────────────────────
 function parseMDY(str) {
   if (!str) return null
@@ -133,11 +122,11 @@ function mthsInForce(dateEnforced) {
   return c
 }
 
-// ── Production Chart (full-featured) ─────────────────────────────────────────
-const GCW = 640, GCH = 155
-const GPAD = { top: 14, right: 14, bottom: 32, left: 52 }
+// ── Production Chart ──────────────────────────────────────────────────────────
+const GCW = 640, GCH = 300
+const GPAD = { top: 20, right: 16, bottom: 52, left: 64 }
 
-function ProductionChart({ points, color = '#7c3aed', fmtTip = v => fmt(v) }) {
+function ProductionChart({ points, color = '#22d3ee', fmtTip = v => fmt(v) }) {
   const [hovered, setHovered] = useState(null)
   const wrapRef = useRef(null)
 
@@ -149,11 +138,12 @@ function ProductionChart({ points, color = '#7c3aed', fmtTip = v => fmt(v) }) {
     setHovered({ i, x: er.left - wr.left + er.width / 2, y: er.top - wr.top, pt })
   }, [])
 
+  const vals = points.map(p => p.y)
+  const hasRealData = vals.some(v => v > 0)
+
   if (!points.length) {
     return <div className="earn-chart-empty">No data yet — sales will appear here as you close policies.</div>
   }
-
-  const vals = points.map(p => p.y)
   const maxV = Math.max(...vals) * 1.18 || 1
   const xR   = GCW - GPAD.left - GPAD.right
   const yR   = GCH - GPAD.top  - GPAD.bottom
@@ -197,8 +187,8 @@ function ProductionChart({ points, color = '#7c3aed', fmtTip = v => fmt(v) }) {
           <g key={i}>
             <line x1={GPAD.left} y1={t.y} x2={GCW - GPAD.right} y2={t.y}
               stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-            <text x={GPAD.left - 5} y={t.y + 4} textAnchor="end"
-              fontSize="10" fill="#444" fontFamily="inherit">
+            <text x={GPAD.left - 8} y={t.y + 4} textAnchor="end"
+              fontSize="12" fill="#555" fontFamily="inherit">
               {fmtTickY(t.v)}
             </text>
           </g>
@@ -210,24 +200,24 @@ function ProductionChart({ points, color = '#7c3aed', fmtTip = v => fmt(v) }) {
         {/* Area fill */}
         <path d={area} fill={`url(#${gradId})`} />
         {/* Line */}
-        <path d={line} stroke={color} strokeWidth="2"
+        <path d={line} stroke={color} strokeWidth="2.5"
           fill="none" strokeLinecap="round" strokeLinejoin="round" />
         {/* Red average dashed line */}
         <line x1={GPAD.left} y1={avgY} x2={GCW - GPAD.right} y2={avgY}
-          stroke="#e05c5c" strokeWidth="1.2" strokeDasharray="5 3" opacity="0.65" />
+          stroke="#e05c5c" strokeWidth="1.5" strokeDasharray="6 4" opacity="0.65" />
         {/* X-axis labels */}
         {svgPts.map((p, i) =>
           i % xStep === 0 && (
-            <text key={i} x={p.x} y={GCH - 6} textAnchor="middle"
-              fontSize="9" fill="#444" fontFamily="inherit">
+            <text key={i} x={p.x} y={GCH - 10} textAnchor="middle"
+              fontSize="11" fill="#555" fontFamily="inherit">
               {p.lbl}
             </text>
           )
         )}
-        {/* Visible dots (non-interactive) */}
+        {/* Visible dots */}
         {svgPts.map((p, i) => (
           <circle key={i} cx={p.x} cy={p.y}
-            r={hovered?.i === i ? 5 : 3.5}
+            r={hovered?.i === i ? 7 : 5}
             fill={color} opacity={hovered?.i === i ? 1 : 0.85}
             pointerEvents="none" />
         ))}
@@ -260,7 +250,7 @@ function ProductionChart({ points, color = '#7c3aed', fmtTip = v => fmt(v) }) {
   )
 }
 
-// ── Stats Grid (below personal charts) ───────────────────────────────────────
+// ── Stats Grid ────────────────────────────────────────────────────────────────
 function StatsGrid({ items }) {
   return (
     <div className="earn-stats-grid">
@@ -351,43 +341,208 @@ function StatBox({ title, value, subtitle, color = '#22d3ee', expanded, onToggle
   )
 }
 
-// ── Resolve Modal ─────────────────────────────────────────────────────────────
-function ResolveModal({ cb, onResolve, onCancel }) {
-  const [paid, setPaid] = useState(String(cb.amountPaidBack || ''))
+// ── Edit Payments Modal ───────────────────────────────────────────────────────
+function EditPaymentsModal({ cb, onUpdate, onClose }) {
+  const [payments,    setPayments]    = useState(() => (cb.payments || []).map((p, i) => ({ ...p, _key: i })))
+  const [editingIdx,  setEditingIdx]  = useState(null) // index into payments array
+  const [editingAmt,  setEditingAmt]  = useState('')
+  const [addMode,     setAddMode]     = useState(null)  // null | 'full' | 'partial'
+  const [addAmt,      setAddAmt]      = useState('')
+
+  // Live recalculation based on local payments state
+  const totalPaid  = payments.reduce((s, p) => s + (p.amount || 0), 0)
+  const remaining  = Math.max(0, (cb.chargebackAmount || 0) - totalPaid)
+  const isResolved = remaining === 0 && payments.length > 0
+
+  // Persist updated payments to parent + localStorage immediately
+  function persist(updatedPayments) {
+    const paid     = updatedPayments.reduce((s, p) => s + (p.amount || 0), 0)
+    const resolved = paid >= (cb.chargebackAmount || 0) && updatedPayments.length > 0
+    onUpdate({
+      ...cb,
+      payments:      updatedPayments,
+      amountPaidBack: paid,
+      resolved,
+    })
+  }
+
+  // ── Edit a payment row ────────────────────────────────────────────────────
+  function startEdit(idx) {
+    setEditingIdx(idx)
+    setEditingAmt(String(payments[idx].amount ?? ''))
+    setAddMode(null)
+  }
+
+  function cancelEdit() {
+    setEditingIdx(null)
+    setEditingAmt('')
+  }
+
+  function saveEdit(idx) {
+    const amt = parseFloat(editingAmt)
+    if (isNaN(amt) || amt < 0) return
+    const updated = payments.map((p, i) => i === idx ? { ...p, amount: amt } : p)
+    setPayments(updated)
+    setEditingIdx(null)
+    setEditingAmt('')
+    persist(updated)
+  }
+
+  // ── Delete a payment row ──────────────────────────────────────────────────
+  function deletePayment(idx) {
+    const updated = payments.filter((_, i) => i !== idx)
+    setPayments(updated)
+    if (editingIdx === idx) { setEditingIdx(null); setEditingAmt('') }
+    persist(updated)
+  }
+
+  // ── Add a new payment ─────────────────────────────────────────────────────
+  function handleAdd() {
+    const amt = addMode === 'full' ? remaining : parseFloat(addAmt)
+    if (!amt || amt <= 0) return
+    const newEntry = { date: new Date().toISOString(), amount: amt, _key: Date.now() }
+    const updated  = [...payments, newEntry]
+    setPayments(updated)
+    setAddMode(null)
+    setAddAmt('')
+    persist(updated)
+  }
+
   return (
-    <div className="db-overlay" onClick={onCancel}>
-      <div className="db-modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+    <div className="db-overlay" onClick={onClose}>
+      <div className="db-modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
         <div className="db-modal-head">
-          <h2 className="db-modal-title">Resolve Chargeback</h2>
-          <button className="db-modal-close" onClick={onCancel}>
+          <h2 className="db-modal-title">Edit Payments — {cb.clientName}</h2>
+          <button className="db-modal-close" onClick={onClose}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
             </svg>
           </button>
         </div>
+
         <div style={{ padding: '20px 24px 24px' }}>
-          <p style={{ fontSize: 13, color: '#888', marginBottom: 8, lineHeight: 1.6 }}>
-            Recording that <strong style={{ color: '#fff' }}>{cb.clientName}</strong>'s
-            chargeback debt has been paid off.
-          </p>
-          <p style={{ fontSize: 12, color: '#555', marginBottom: 16, lineHeight: 1.6 }}>
-            Note: Resolving a chargeback marks it as paid for bookkeeping purposes only.
-            The chargeback amount (<strong style={{ color: '#e05c5c' }}>{fmt(cb.chargebackAmount)}</strong>)
-            remains permanently deducted from your Net Earnings — the money cannot be recovered.
-          </p>
-          <div className="db-field" style={{ marginBottom: 20 }}>
-            <label className="db-field-label">Amount Paid Back ($)</label>
-            <input className="db-field-input" type="number" min="0"
-              value={paid} onChange={e => setPaid(e.target.value)}
-              placeholder="0" />
+
+          {/* ── Summary strip ── */}
+          <div className="earn-pay-summary">
+            <div className="earn-pay-summary-item">
+              <span className="earn-pay-summary-label">Original</span>
+              <span className="earn-pay-summary-val" style={{ color: '#e05c5c' }}>{fmt(cb.chargebackAmount)}</span>
+            </div>
+            <div className="earn-pay-summary-item">
+              <span className="earn-pay-summary-label">Total Paid</span>
+              <span className="earn-pay-summary-val" style={{ color: '#4caf84' }}>{fmt(totalPaid)}</span>
+            </div>
+            <div className="earn-pay-summary-item">
+              <span className="earn-pay-summary-label">Remaining</span>
+              <span className="earn-pay-summary-val" style={{ color: remaining > 0 ? '#e05c5c' : '#4caf84' }}>
+                {remaining > 0 ? fmt(remaining) : 'Paid off'}
+              </span>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button className="db-btn-cancel" style={{ flex: 1 }} onClick={onCancel}>Cancel</button>
-            <button className="db-btn-save" style={{ flex: 2 }}
-              onClick={() => onResolve(parseFloat(paid) || 0)}>
-              Mark Resolved
-            </button>
+
+          {/* ── Status badge ── */}
+          {isResolved && (
+            <div className="earn-pay-resolved-note" style={{ marginBottom: 16 }}>
+              ✓ Fully paid — this chargeback is resolved
+            </div>
+          )}
+
+          {/* ── Payment history with Edit / Delete ── */}
+          <div className="earn-pay-history">
+            <div className="earn-pay-history-head">Payment History</div>
+
+            {payments.length === 0 ? (
+              <div className="earn-pay-empty">No payments recorded yet.</div>
+            ) : (
+              payments.map((p, i) => (
+                <div key={p._key ?? i} className="earn-pay-edit-row">
+                  <span className="earn-pay-history-date">{fmtDate(p.date)}</span>
+
+                  {editingIdx === i ? (
+                    /* Inline edit mode */
+                    <div className="earn-pay-inline-edit">
+                      <span className="earn-pay-edit-dollar">$</span>
+                      <input
+                        className="earn-pay-inline-input"
+                        type="number" min="0" step="0.01"
+                        value={editingAmt}
+                        onChange={e => setEditingAmt(e.target.value)}
+                        autoFocus
+                        onKeyDown={e => {
+                          if (e.key === 'Enter')  saveEdit(i)
+                          if (e.key === 'Escape') cancelEdit()
+                        }}
+                      />
+                      <button className="earn-pay-inline-save"   onClick={() => saveEdit(i)}>Save</button>
+                      <button className="earn-pay-inline-cancel" onClick={cancelEdit}>✕</button>
+                    </div>
+                  ) : (
+                    /* Normal display mode */
+                    <div className="earn-pay-edit-actions">
+                      <span className="earn-pay-history-amt" style={{ color: '#4caf84' }}>
+                        +{fmt(p.amount)}
+                      </span>
+                      <button className="earn-pay-edit-btn"
+                        onClick={() => startEdit(i)}>
+                        Edit
+                      </button>
+                      <button className="earn-pay-delete-btn"
+                        onClick={() => deletePayment(i)}>
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
+
+          {/* ── Add new payment section ── */}
+          {remaining > 0 && (
+            <div className="earn-pay-add-section">
+              {addMode === null ? (
+                <div className="earn-pay-mode-row">
+                  <button className="earn-pay-mode-btn active"
+                    onClick={() => { setAddMode('full'); setEditingIdx(null) }}>
+                    Pay in Full ({fmt(remaining)})
+                  </button>
+                  <button className="earn-pay-mode-btn"
+                    onClick={() => { setAddMode('partial'); setEditingIdx(null) }}>
+                    Make a Payment
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {addMode === 'partial' && (
+                    <div className="db-field" style={{ marginBottom: 10 }}>
+                      <label className="db-field-label">Payment Amount ($)</label>
+                      <input className="db-field-input" type="number" min="0" step="0.01"
+                        value={addAmt} onChange={e => setAddAmt(e.target.value)}
+                        placeholder="0.00" autoFocus
+                        onKeyDown={e => e.key === 'Enter' && handleAdd()} />
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="db-btn-cancel" style={{ flex: 1 }}
+                      onClick={() => { setAddMode(null); setAddAmt('') }}>
+                      Cancel
+                    </button>
+                    <button className="db-btn-save" style={{ flex: 2 }} onClick={handleAdd}>
+                      {addMode === 'full' ? 'Record Full Payment' : 'Record Payment'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="earn-pay-note">
+            Changes save instantly. The chargeback amount remains permanently deducted from Net Earnings.
+          </div>
+
+          <button className="db-btn-cancel" style={{ width: '100%', marginTop: 12 }} onClick={onClose}>
+            Done
+          </button>
         </div>
       </div>
     </div>
@@ -402,10 +557,11 @@ export default function Earnings({ onGoToClients }) {
   const [chargebacks,  setChargebacks]  = useState(loadChargebacks)
   const [followUps]                     = useState(loadFollowUps)
   const [goals,        setGoals]        = useState(loadGoals)
+  const [agent]                         = useState(loadAgent)
   const [goalDraft,    setGoalDraft]    = useState(null)
-  const [expandedStat, setExpandedStat] = useState(null)
-  const [statFilters,  setStatFilters]  = useState(['all', 'all', 'all', 'all'])
-  const [resolveTarget, setResolveTarget] = useState(null)
+  const [expandedStats, setExpandedStats] = useState([false, false, false, false])
+  const [statFilters,   setStatFilters]   = useState(['all', 'all', 'all', 'all'])
+  const [payTarget,    setPayTarget]    = useState(null)
 
   // ── Chargeback lookup ──────────────────────────────────────────────────────
   const cbMap = useMemo(() => {
@@ -418,30 +574,25 @@ export default function Earnings({ onGoToClients }) {
   function apptForPeriod(period) {
     return filterPeriod(appointments, period)
   }
-
-  // Gross commission earned in period
   function totalCommForPeriod(period) {
     return apptForPeriod(period).reduce((s, a) => s + calcCommission(a), 0)
   }
-
-  // Submitted AP (all policies in period — including chargebacked)
   function submittedAPForPeriod(period) {
     return apptForPeriod(period).reduce((s, a) => s + calcAP(a), 0)
   }
-
-  // Outstanding chargeback losses (owed - paid) for Chargeback Losses box display
+  // Outstanding chargeback losses (owed - paid) for display
   function cbOutstandingForPeriod(period) {
     return filterPeriod(chargebacks, period, 'chargebackedAt')
-      .reduce((s, cb) => s + Math.max(0, (cb.chargebackAmount || 0) - (cb.amountPaidBack || 0)), 0)
+      .reduce((s, cb) => {
+        const paid = (cb.payments || []).reduce((t, p) => t + (p.amount || 0), 0) || (cb.amountPaidBack || 0)
+        return s + Math.max(0, (cb.chargebackAmount || 0) - paid)
+      }, 0)
   }
-
-  // FULL chargeback amounts (permanent deduction from net — resolution does NOT recover this)
+  // Full chargeback deduction from net (resolution never changes this)
   function cbTotalForPeriod(period) {
     return filterPeriod(chargebacks, period, 'chargebackedAt')
       .reduce((s, cb) => s + (cb.chargebackAmount || 0), 0)
   }
-
-  // Net = gross commission - FULL chargeback amount (resolution doesn't change this)
   function netForPeriod(period) {
     return totalCommForPeriod(period) - cbTotalForPeriod(period)
   }
@@ -469,7 +620,7 @@ export default function Earnings({ onGoToClients }) {
     const worked = followUps.filter(f => (f.currentStep || 0) >= 7).length
     const total  = sold + worked
     if (!total) return null
-    return { rate: pct(sold, total), sold, worked }
+    return { rate: pct(sold, total), sold, worked, total }
   }, [appointments, followUps])
 
   // ── Weekly production data ────────────────────────────────────────────────
@@ -488,19 +639,19 @@ export default function Earnings({ onGoToClients }) {
       y:     v.ap,
       count: v.count,
     }))
-    const totalAP    = entries.reduce((s, [, v]) => s + v.ap, 0)
-    const numWeeks   = entries.length || 1
-    const weeklyAvg  = totalAP / numWeeks
-    const bestWeek   = Math.max(0, ...entries.map(([, v]) => v.ap))
-    const wtdKey     = getWeekKey(new Date().toISOString())
-    const wtd        = map[wtdKey]?.ap || 0
-    const appsWTD    = map[wtdKey]?.count || 0
-    const totalApps  = appointments.length
-    const avgPerApp  = totalApps > 0 ? totalAP / totalApps : 0
+    const totalAP   = entries.reduce((s, [, v]) => s + v.ap, 0)
+    const numWeeks  = entries.length || 1
+    const weeklyAvg = totalAP / numWeeks
+    const bestWeek  = Math.max(0, ...entries.map(([, v]) => v.ap))
+    const wtdKey    = getWeekKey(new Date().toISOString())
+    const wtd       = map[wtdKey]?.ap || 0
+    const appsWTD   = map[wtdKey]?.count || 0
+    const totalApps = appointments.length
+    const avgPerApp = totalApps > 0 ? totalAP / totalApps : 0
     return { points, weeklyAvg, bestWeek, wtd, appsWTD, avgPerApp, numWeeks }
   }, [appointments])
 
-  // ── Monthly production data ───────────────────────────────────────────────
+  // ── Monthly production data (Fix 10: always show all 12 months of current year) ──
   const monthlyData = useMemo(() => {
     const map = {}
     appointments.forEach(a => {
@@ -510,8 +661,14 @@ export default function Earnings({ onGoToClients }) {
       map[k].ap    += calcAP(a)
       map[k].count += 1
     })
+    // Always seed all 12 months of the current calendar year
+    const currentYear = new Date().getFullYear()
+    for (let mo = 1; mo <= 12; mo++) {
+      const k = `${currentYear}-${String(mo).padStart(2, '0')}`
+      if (!map[k]) map[k] = { ap: 0, count: 0 }
+    }
     const entries = Object.entries(map).sort(([a], [b]) => a.localeCompare(b))
-    const points  = entries.slice(-12).map(([k, v]) => {
+    const points  = entries.map(([k, v]) => {
       const [yr, mo] = k.split('-')
       const d = new Date(Number(yr), Number(mo) - 1, 1)
       return {
@@ -521,15 +678,15 @@ export default function Earnings({ onGoToClients }) {
       }
     })
     const totalAP    = entries.reduce((s, [, v]) => s + v.ap, 0)
-    const numMonths  = entries.length || 1
-    const monthlyAvg = totalAP / numMonths
+    const activeMos  = entries.filter(([, v]) => v.ap > 0).length || 1
+    const monthlyAvg = totalAP / activeMos
     const bestMonth  = Math.max(0, ...entries.map(([, v]) => v.ap))
     const mtdKey     = getMonthKey(new Date().toISOString())
     const mtd        = map[mtdKey]?.ap || 0
     const appsMTD    = map[mtdKey]?.count || 0
     const totalApps  = appointments.length
     const avgPerApp  = totalApps > 0 ? totalAP / totalApps : 0
-    return { points, monthlyAvg, bestMonth, mtd, appsMTD, avgPerApp, numMonths }
+    return { points, monthlyAvg, bestMonth, mtd, appsMTD, avgPerApp, numMonths: activeMos }
   }, [appointments])
 
   // ── Goal progress ─────────────────────────────────────────────────────────
@@ -544,11 +701,13 @@ export default function Earnings({ onGoToClients }) {
       const carrierId   = appt?.carrierId   || 'UNKNOWN'
       const carrierName = appt?.carrier     || 'Unknown'
       if (!map[carrierId]) map[carrierId] = { carrierId, carrierName, records: [] }
-      map[carrierId].records.push({
-        ...cb,
-        resolved:      cb.resolved      || false,
-        amountPaidBack: cb.amountPaidBack || 0,
-      })
+      // Normalize: compute totalPaid from payments array, fall back to amountPaidBack
+      const payments  = cb.payments || []
+      const totalPaid = payments.length
+        ? payments.reduce((s, p) => s + (p.amount || 0), 0)
+        : (cb.amountPaidBack || 0)
+      const resolved  = totalPaid >= (cb.chargebackAmount || 0)
+      map[carrierId].records.push({ ...cb, payments, totalPaid, resolved })
     })
     return Object.values(map).sort((a, b) => b.records.length - a.records.length)
   }, [chargebacks, appointments])
@@ -561,33 +720,24 @@ export default function Earnings({ onGoToClients }) {
     setGoalDraft(null)
   }
 
-  function handleResolve(paid) {
-    const updated = chargebacks.map(cb =>
-      cb.id === resolveTarget.id
-        ? { ...cb, amountPaidBack: paid, resolved: paid >= (cb.chargebackAmount || 0) }
-        : cb
-    )
+  // Called by EditPaymentsModal on every edit/delete/add — saves immediately, keeps modal open
+  function handleCBUpdate(updatedCb) {
+    const updated = chargebacks.map(cb => cb.id === updatedCb.id ? updatedCb : cb)
     setChargebacks(updated)
     saveChargebacks(updated)
-    setResolveTarget(null)
   }
 
   function setStatFilter(idx, val) {
     setStatFilters(prev => prev.map((f, i) => i === idx ? val : f))
   }
   function toggleStat(idx) {
-    setExpandedStat(prev => prev === idx ? null : idx)
+    setExpandedStats(prev => prev.map((v, i) => i === idx ? !v : v))
   }
 
-  // ── Box 0: Commission breakdown by carrier ────────────────────────────────
-  const commByCarrier = useMemo(() => {
-    const map = {}
-    filterPeriod(appointments, sf[0]).forEach(a => {
-      const k = a.carrier || 'Unknown'
-      if (!map[k]) map[k] = 0
-      map[k] += calcCommission(a)
-    })
-    return Object.entries(map).sort(([, a], [, b]) => b - a)
+  // ── Box 0: Commission breakdown by policy (with commissionPct) ─────────────
+  const commByPolicy = useMemo(() => {
+    return filterPeriod(appointments, sf[0])
+      .sort((a, b) => calcCommission(b) - calcCommission(a))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointments, sf[0]])
 
@@ -614,27 +764,30 @@ export default function Earnings({ onGoToClients }) {
   }, [appointments, chargebacks, sf[3]])
 
   // ── All-time header stats ─────────────────────────────────────────────────
+  const totalAP     = appointments.reduce((s, a) => s + calcAP(a), 0)
   const totalComm   = appointments.reduce((s, a) => s + calcCommission(a), 0)
   const totalCBLoss = chargebacks.reduce((s, cb) => s + (cb.chargebackAmount || 0), 0)
 
-  // Weekly stats grid items
+  // Agent commission %
+  const agentCommPct = agent?.contractLevel ? `${agent.contractLevel}%` : null
+
+  // Stats grid items
   const weeklyStats = [
-    { label: 'WTD Production',      value: fmt(weeklyData.wtd),           color: '#22d3ee' },
-    { label: 'Avg AP / App',         value: fmt(weeklyData.avgPerApp),     color: '#ffffff' },
-    { label: 'Apps This Week',       value: weeklyData.appsWTD,            color: '#ffffff' },
-    { label: 'Best Week',            value: fmt(weeklyData.bestWeek),      color: '#a78bfa' },
-    { label: 'Weekly Average',       value: fmt(weeklyData.weeklyAvg),     color: '#ffffff' },
-    { label: 'Closing Rate',         value: closingRate ? `${closingRate.rate}%` : '—', color: '#4caf84' },
+    { label: 'WTD Production',  value: fmt(weeklyData.wtd),       color: '#22d3ee' },
+    { label: 'Avg AP / App',    value: fmt(weeklyData.avgPerApp),  color: '#ffffff' },
+    { label: 'Apps This Week',  value: weeklyData.appsWTD,         color: '#ffffff' },
+    { label: 'Best Week',       value: fmt(weeklyData.bestWeek),   color: '#a78bfa' },
+    { label: 'Weekly Average',  value: fmt(weeklyData.weeklyAvg),  color: '#ffffff' },
+    { label: 'Closing Rate',    value: closingRate ? `${closingRate.rate}%` : '—', color: '#4caf84' },
   ]
 
-  // Monthly stats grid items
   const monthlyStats = [
-    { label: 'MTD Production',       value: fmt(monthlyData.mtd),          color: '#7c3aed' },
-    { label: 'Avg AP / App',          value: fmt(monthlyData.avgPerApp),    color: '#ffffff' },
-    { label: 'Apps This Month',       value: monthlyData.appsMTD,           color: '#ffffff' },
-    { label: 'Best Month',            value: fmt(monthlyData.bestMonth),    color: '#a78bfa' },
-    { label: 'Monthly Average',       value: fmt(monthlyData.monthlyAvg),   color: '#ffffff' },
-    { label: 'Closing Rate',          value: closingRate ? `${closingRate.rate}%` : '—', color: '#4caf84' },
+    { label: 'MTD Production',  value: fmt(monthlyData.mtd),       color: '#22d3ee' },
+    { label: 'Avg AP / App',    value: fmt(monthlyData.avgPerApp),  color: '#ffffff' },
+    { label: 'Apps This Month', value: monthlyData.appsMTD,         color: '#ffffff' },
+    { label: 'Best Month',      value: fmt(monthlyData.bestMonth),  color: '#a78bfa' },
+    { label: 'Monthly Average', value: fmt(monthlyData.monthlyAvg), color: '#ffffff' },
+    { label: 'Closing Rate',    value: closingRate ? `${closingRate.rate}%` : '—', color: '#4caf84' },
   ]
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -646,10 +799,10 @@ export default function Earnings({ onGoToClients }) {
         <div className="earn-eyebrow">Financial Performance</div>
         <h1 className="earn-title">Earnings</h1>
         <p className="earn-subtitle">
-          All-time commission:{' '}
-          <span className="earn-hi">{fmt(totalComm)}</span>
+          Submitted AP: <span style={{ color: '#4caf84' }}>{fmt(totalAP)}</span>
+          {' · '}Commission: <span className="earn-hi">{fmt(totalComm)}</span>
           {totalCBLoss > 0 && (
-            <> · chargeback losses: <span className="earn-danger">{fmt(totalCBLoss)}</span></>
+            <> · Chargebacks: <span className="earn-danger">{fmt(totalCBLoss)}</span></>
           )}
         </p>
       </div>
@@ -661,20 +814,42 @@ export default function Earnings({ onGoToClients }) {
         <StatBox
           title="Commission Earned"
           value={fmt(totalCommForPeriod(sf[0]))}
-          subtitle="9-mo advance · 12-mo for Ethos"
+          subtitle={agentCommPct
+            ? `Paid at ${agentCommPct} commission · 9-month advance basis`
+            : '9-month advance basis'}
           color="#22d3ee"
-          expanded={expandedStat === 0}
+          expanded={expandedStats[0]}
           onToggle={() => toggleStat(0)}
           filter={sf[0]}
           onFilter={v => setStatFilter(0, v)}
         >
-          <div className="earn-detail-label">Breakdown by carrier</div>
-          {commByCarrier.length === 0
+          <div className="earn-detail-label">Commission by policy</div>
+          {commByPolicy.length === 0
             ? <div className="earn-detail-empty">No policies this period.</div>
-            : commByCarrier.map(([carrier, comm]) => (
-              <div key={carrier} className="earn-detail-row">
-                <span className="earn-detail-key">{carrier}</span>
-                <span className="earn-detail-val" style={{ color: '#22d3ee' }}>{fmt(comm)}</span>
+            : commByPolicy.map(a => (
+              <div key={a.id} className="earn-detail-row">
+                <div className="earn-detail-key">
+                  {a.clientName || 'Unknown'}
+                  <span className="earn-detail-carrier">
+                    {' · '}
+                    {CARRIER_LOGOS[a.carrierId] && (
+                      <img
+                        src={CARRIER_LOGOS[a.carrierId]}
+                        alt={a.carrier}
+                        className="earn-detail-logo"
+                      />
+                    )}
+                    {a.carrier}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {a.commissionPct > 0 && (
+                    <span style={{ fontSize: 11, color: '#555' }}>{a.commissionPct}%</span>
+                  )}
+                  <span className="earn-detail-val" style={{ color: '#22d3ee' }}>
+                    {fmt(calcCommission(a))}
+                  </span>
+                </div>
               </div>
             ))
           }
@@ -686,7 +861,7 @@ export default function Earnings({ onGoToClients }) {
           value={fmt(submittedAPForPeriod(sf[1]))}
           subtitle={`${submittedPolicies.length} ${submittedPolicies.length === 1 ? 'policy' : 'policies'} submitted`}
           color="#4caf84"
-          expanded={expandedStat === 1}
+          expanded={expandedStats[1]}
           onToggle={() => toggleStat(1)}
           filter={sf[1]}
           onFilter={v => setStatFilter(1, v)}
@@ -695,16 +870,34 @@ export default function Earnings({ onGoToClients }) {
           {submittedPolicies.length === 0
             ? <div className="earn-detail-empty">No policies submitted this period.</div>
             : submittedPolicies.map(a => {
-              const isCB = !!cbMap[a.id]
+              const cbRecord = cbMap[a.id]
+              const isCB     = !!cbRecord
+              // For chargebacked policies, read the pre-calculated chargebackAmount directly
+              // from chargeback_records — never recalculate here. The correct formula
+              // (advance × commPct − already earned, capped at advance) was already applied
+              // when the agent clicked Chargeback in the Clients section.
+              const displayAmt = isCB
+                ? (cbRecord.chargebackAmount ?? 0)
+                : calcAP(a)
               return (
                 <div key={a.id} className="earn-detail-row">
                   <div className="earn-detail-key">
                     {a.clientName || 'Unknown'}
-                    <span className="earn-detail-carrier"> · {a.carrier}</span>
+                    <span className="earn-detail-carrier">
+                      {' · '}
+                      {CARRIER_LOGOS[a.carrierId] && (
+                        <img
+                          src={CARRIER_LOGOS[a.carrierId]}
+                          alt={a.carrier}
+                          className="earn-detail-logo"
+                        />
+                      )}
+                      {a.carrier}
+                    </span>
                     {isCB && <span className="earn-cb-tag"> CB</span>}
                   </div>
                   <span className="earn-detail-val" style={{ color: isCB ? '#e05c5c' : '#4caf84' }}>
-                    {fmt(calcAP(a))}
+                    {isCB ? `−${fmt(displayAmt)}` : fmt(displayAmt)}
                   </span>
                 </div>
               )
@@ -718,7 +911,7 @@ export default function Earnings({ onGoToClients }) {
           value={fmt(cbOutstandingForPeriod(sf[2]))}
           subtitle={`${cbFiltered.length} chargeback${cbFiltered.length !== 1 ? 's' : ''} this period`}
           color="#e05c5c"
-          expanded={expandedStat === 2}
+          expanded={expandedStats[2]}
           onToggle={() => toggleStat(2)}
           filter={sf[2]}
           onFilter={v => setStatFilter(2, v)}
@@ -727,7 +920,12 @@ export default function Earnings({ onGoToClients }) {
           {cbFiltered.length === 0
             ? <div className="earn-detail-empty">No chargebacks this period.</div>
             : cbFiltered.map(cb => {
-              const outstanding = Math.max(0, (cb.chargebackAmount || 0) - (cb.amountPaidBack || 0))
+              const payments  = cb.payments || []
+              const totalPaid = payments.length
+                ? payments.reduce((s, p) => s + (p.amount || 0), 0)
+                : (cb.amountPaidBack || 0)
+              const outstanding = Math.max(0, (cb.chargebackAmount || 0) - totalPaid)
+              const isResolved  = totalPaid >= (cb.chargebackAmount || 0)
               return (
                 <div key={cb.id} className="earn-detail-row">
                   <div className="earn-detail-key">
@@ -735,15 +933,11 @@ export default function Earnings({ onGoToClients }) {
                     <span className="earn-cb-date"> · {fmtDate(cb.chargebackedAt)}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className="earn-detail-val" style={{ color: '#e05c5c' }}>
-                      −{fmt(outstanding)}
-                    </span>
-                    {cb.resolved
+                    {isResolved
                       ? <span className="earn-resolved-badge">Resolved</span>
-                      : <button className="earn-resolve-btn" onClick={() => setResolveTarget(cb)}>
-                          Resolve
-                        </button>
+                      : <span className="earn-detail-val" style={{ color: '#e05c5c' }}>−{fmt(outstanding)}</span>
                     }
+                    <button className="earn-resolve-btn" onClick={() => setPayTarget(cb)}>Edit</button>
                   </div>
                 </div>
               )
@@ -757,7 +951,7 @@ export default function Earnings({ onGoToClients }) {
           value={fmt(netForPeriod(sf[3]))}
           subtitle="Commission minus all chargeback amounts"
           color={netForPeriod(sf[3]) >= 0 ? '#a78bfa' : '#e05c5c'}
-          expanded={expandedStat === 3}
+          expanded={expandedStats[3]}
           onToggle={() => toggleStat(3)}
           filter={sf[3]}
           onFilter={v => setStatFilter(3, v)}
@@ -846,7 +1040,7 @@ export default function Earnings({ onGoToClients }) {
                 <div className="earn-goal-item-head">
                   <span className="earn-goal-item-label">Monthly AP (MTD)</span>
                   <span className="earn-goal-item-vals">
-                    <span style={{ color: '#7c3aed' }}>{fmt(monthlyActualAP)}</span>
+                    <span style={{ color: '#22d3ee' }}>{fmt(monthlyActualAP)}</span>
                     {goals.monthlyAP && (
                       <span className="earn-goal-sep"> / {fmt(Number(goals.monthlyAP))}</span>
                     )}
@@ -856,7 +1050,7 @@ export default function Earnings({ onGoToClients }) {
                   ? <div className="earn-goal-bar-wrap">
                       <div className="earn-goal-bar" style={{
                         width: `${Math.min(100, pct(monthlyActualAP, Number(goals.monthlyAP)))}%`,
-                        background: monthlyActualAP >= Number(goals.monthlyAP) ? '#4caf84' : '#7c3aed',
+                        background: monthlyActualAP >= Number(goals.monthlyAP) ? '#4caf84' : '#22d3ee',
                       }} />
                     </div>
                   : <div className="earn-goal-unset">No goal set — click Edit Goals to add one</div>
@@ -905,7 +1099,7 @@ export default function Earnings({ onGoToClients }) {
                   value={closingRate.rate}
                   size={130}
                   color="#7c3aed"
-                  label="sold / worked"
+                  label={`${closingRate.sold} sold / ${closingRate.total} appointments`}
                   sublabel="close rate"
                 />
                 <div className="earn-circle-stats">
@@ -1004,31 +1198,19 @@ export default function Earnings({ onGoToClients }) {
       ) : (
         <div className="earn-cb-grid">
           {cbByCarrier.map(({ carrierId, carrierName, records }) => {
-            const logoFile   = CARRIER_LOGOS[carrierId]
-            const totalOwed  = records.reduce((s, cb) =>
-              s + Math.max(0, (cb.chargebackAmount || 0) - (cb.amountPaidBack || 0)), 0)
-            const resolved   = records.filter(cb => cb.resolved).length
-            const pending    = records.length - resolved
+            const logoSrc   = CARRIER_LOGOS[carrierId]
+            const totalOwed = records.reduce((s, cb) =>
+              s + Math.max(0, (cb.chargebackAmount || 0) - cb.totalPaid), 0)
+            const resolved  = records.filter(cb => cb.resolved).length
+            const pending   = records.length - resolved
 
             return (
               <div key={carrierId} className="earn-glass earn-cb-carrier-card">
                 <div className="earn-cb-carrier-head">
-                  {logoFile
-                    ? <img
-                        src={`/logos/${logoFile}`}
-                        alt={carrierName}
-                        className="earn-cb-logo"
-                        onError={e => {
-                          e.currentTarget.style.display = 'none'
-                          e.currentTarget.nextSibling.style.display = 'flex'
-                        }}
-                      />
-                    : null
+                  {logoSrc
+                    ? <img src={logoSrc} alt={carrierName} className="earn-cb-logo" />
+                    : <div className="earn-cb-logo-fallback">{(carrierId || '?').slice(0, 3)}</div>
                   }
-                  <div className="earn-cb-logo-fallback"
-                    style={{ display: logoFile ? 'none' : 'flex' }}>
-                    {(carrierId || '?').slice(0, 3)}
-                  </div>
                   <div>
                     <div className="earn-cb-carrier-name">{carrierName}</div>
                     <div className="earn-cb-carrier-sub">
@@ -1048,27 +1230,37 @@ export default function Earnings({ onGoToClients }) {
 
                 <div className="earn-cb-records">
                   {records.map(cb => {
-                    const owed = Math.max(0, (cb.chargebackAmount || 0) - (cb.amountPaidBack || 0))
+                    const remaining = Math.max(0, (cb.chargebackAmount || 0) - cb.totalPaid)
                     return (
                       <div key={cb.id} className="earn-cb-record">
-                        <div className="earn-cb-record-name">{cb.clientName}</div>
-                        <div className="earn-cb-record-meta">
-                          {fmtDate(cb.chargebackedAt)} · Month {cb.monthAtChargeback}
+                        <div className="earn-cb-record-top">
+                          <div>
+                            <div className="earn-cb-record-name">{cb.clientName}</div>
+                            <div className="earn-cb-record-meta">
+                              {fmtDate(cb.chargebackedAt)} · Month {cb.monthAtChargeback}
+                            </div>
+                          </div>
+                          <div className="earn-cb-record-right">
+                            {cb.resolved
+                              ? <span className="earn-resolved-badge">Resolved</span>
+                              : <span className="earn-cb-owed">{fmt(remaining)}</span>
+                            }
+                            <button className="earn-resolve-btn" onClick={() => setPayTarget(cb)}>
+                              Edit
+                            </button>
+                          </div>
                         </div>
-                        <div className="earn-cb-record-right">
-                          {cb.resolved
-                            ? <span className="earn-resolved-badge">Resolved</span>
-                            : (
-                              <>
-                                <span className="earn-cb-owed">{fmt(owed)}</span>
-                                <button className="earn-resolve-btn"
-                                  onClick={() => setResolveTarget(cb)}>
-                                  Resolve
-                                </button>
-                              </>
-                            )
-                          }
-                        </div>
+
+                        {/* Payment history inline preview */}
+                        {cb.payments && cb.payments.length > 0 && (
+                          <div className="earn-cb-pay-history-preview">
+                            {cb.payments.map((p, i) => (
+                              <span key={i} className="earn-cb-pay-chip">
+                                {fmtDate(p.date)}: {fmt(p.amount)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -1079,12 +1271,12 @@ export default function Earnings({ onGoToClients }) {
         </div>
       )}
 
-      {/* ── Resolve Modal ── */}
-      {resolveTarget && (
-        <ResolveModal
-          cb={resolveTarget}
-          onResolve={handleResolve}
-          onCancel={() => setResolveTarget(null)}
+      {/* ── Edit Payments Modal ── */}
+      {payTarget && (
+        <EditPaymentsModal
+          cb={payTarget}
+          onUpdate={handleCBUpdate}
+          onClose={() => setPayTarget(null)}
         />
       )}
     </div>
