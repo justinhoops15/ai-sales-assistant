@@ -26,6 +26,7 @@ function saveAppointment({ application, clientName, formData, agentInfo, editing
     clientSex:        formData.clientInfo?.sex            || '',
     clientState:      formData.clientInfo?.state          || '',
     clientPhone:      formData.clientInfo?.phoneNumber    || '',
+    clientEmail:      formData.clientInfo?.clientEmail   || '',
     maritalStatus:    formData.clientInfo?.maritalStatus  || '',
     spouseName:       formData.clientInfo?.spouseName     || '',
     beneficiaries:    formData.clientInfo?.beneficiaries  || [],
@@ -162,6 +163,7 @@ export default function AppointmentSummary({
               <Row label="Sex"         value={client.sex === 'male' ? 'Male' : 'Female'} />
               {client.state          && <Row label="State"          value={client.state} />}
               {client.phoneNumber    && <Row label="Phone"          value={client.phoneNumber} />}
+              {client.clientEmail   && <Row label="Email"          value={client.clientEmail} />}
               {client.maritalStatus  && <Row label="Marital Status" value={client.maritalStatus} />}
               {client.maritalStatus === 'Married' && client.spouseName && (
                 <Row label="Spouse Name" value={client.spouseName} />

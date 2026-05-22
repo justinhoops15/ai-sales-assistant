@@ -215,7 +215,7 @@ export default function Step2ClientInfo({ data, onChange, onNext, onBack, onCanc
         </div>
 
         {/* Row 2: D.O.B | (empty) | Phone — aligns under Age and State */}
-        <div className="form-grid grid-3" style={{ marginBottom: 16 }}>
+        <div className="form-grid grid-3" style={{ marginBottom: 8 }}>
           <div className="field">
             <label className="field-label">Date of Birth</label>
             <input
@@ -239,6 +239,25 @@ export default function Step2ClientInfo({ data, onChange, onNext, onBack, onCanc
               value={data.phoneNumber || ''}
               onChange={e => set('phoneNumber', formatPhone(e.target.value))}
               maxLength={12}
+            />
+          </div>
+        </div>
+
+        {/* Row 3: Email (optional, full width under DOB/Phone row) */}
+        <div className="form-grid grid-3" style={{ marginBottom: 16 }}>
+          <div /> {/* spacer col 1 */}
+          <div /> {/* spacer col 2 */}
+          <div className="field">
+            <label className="field-label">
+              Email
+              <span style={{ fontSize: 11, color: '#555555', fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 6 }}>optional</span>
+            </label>
+            <input
+              className="field-input"
+              type="email"
+              placeholder="client@example.com"
+              value={data.clientEmail || ''}
+              onChange={e => set('clientEmail', e.target.value)}
             />
           </div>
         </div>

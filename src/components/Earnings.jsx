@@ -841,6 +841,9 @@ export default function Earnings({ onGoToClients }) {
                     )}
                     {a.carrier}
                   </span>
+                  {a.dateEnforced && (
+                    <span className="earn-enforced-date"> · Enforced: {a.dateEnforced}</span>
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   {a.commissionPct > 0 && (
@@ -866,42 +869,30 @@ export default function Earnings({ onGoToClients }) {
           filter={sf[1]}
           onFilter={v => setStatFilter(1, v)}
         >
-          <div className="earn-detail-label">All submitted policies (annual premium)</div>
+          <div className="earn-detail-label">All submitted policies — gross AP (chargebacks tracked separately)</div>
           {submittedPolicies.length === 0
             ? <div className="earn-detail-empty">No policies submitted this period.</div>
-            : submittedPolicies.map(a => {
-              const cbRecord = cbMap[a.id]
-              const isCB     = !!cbRecord
-              // For chargebacked policies, read the pre-calculated chargebackAmount directly
-              // from chargeback_records — never recalculate here. The correct formula
-              // (advance × commPct − already earned, capped at advance) was already applied
-              // when the agent clicked Chargeback in the Clients section.
-              const displayAmt = isCB
-                ? (cbRecord.chargebackAmount ?? 0)
-                : calcAP(a)
-              return (
-                <div key={a.id} className="earn-detail-row">
-                  <div className="earn-detail-key">
-                    {a.clientName || 'Unknown'}
-                    <span className="earn-detail-carrier">
-                      {' · '}
-                      {CARRIER_LOGOS[a.carrierId] && (
-                        <img
-                          src={CARRIER_LOGOS[a.carrierId]}
-                          alt={a.carrier}
-                          className="earn-detail-logo"
-                        />
-                      )}
-                      {a.carrier}
-                    </span>
-                    {isCB && <span className="earn-cb-tag"> CB</span>}
-                  </div>
-                  <span className="earn-detail-val" style={{ color: isCB ? '#e05c5c' : '#4caf84' }}>
-                    {isCB ? `−${fmt(displayAmt)}` : fmt(displayAmt)}
+            : submittedPolicies.map(a => (
+              <div key={a.id} className="earn-detail-row">
+                <div className="earn-detail-key">
+                  {a.clientName || 'Unknown'}
+                  <span className="earn-detail-carrier">
+                    {' · '}
+                    {CARRIER_LOGOS[a.carrierId] && (
+                      <img
+                        src={CARRIER_LOGOS[a.carrierId]}
+                        alt={a.carrier}
+                        className="earn-detail-logo"
+                      />
+                    )}
+                    {a.carrier}
                   </span>
                 </div>
-              )
-            })
+                <span className="earn-detail-val" style={{ color: '#4caf84' }}>
+                  {fmt(calcAP(a))}
+                </span>
+              </div>
+            ))
           }
         </StatBox>
 
@@ -920,16 +911,33 @@ export default function Earnings({ onGoToClients }) {
           {cbFiltered.length === 0
             ? <div className="earn-detail-empty">No chargebacks this period.</div>
             : cbFiltered.map(cb => {
-              const payments  = cb.payments || []
-              const totalPaid = payments.length
+              const payments    = cb.payments || []
+              const totalPaid   = payments.length
                 ? payments.reduce((s, p) => s + (p.amount || 0), 0)
                 : (cb.amountPaidBack || 0)
               const outstanding = Math.max(0, (cb.chargebackAmount || 0) - totalPaid)
               const isResolved  = totalPaid >= (cb.chargebackAmount || 0)
+              // Look up carrier info from parent appointment
+              const appt = appointments.find(a => a.id === cb.clientId)
+              const carrierId   = appt?.carrierId || cb.carrierId || null
+              const carrierName = appt?.carrier   || cb.carrier   || null
               return (
                 <div key={cb.id} className="earn-detail-row">
                   <div className="earn-detail-key">
                     {cb.clientName}
+                    {carrierName && (
+                      <span className="earn-detail-carrier">
+                        {' · '}
+                        {carrierId && CARRIER_LOGOS[carrierId] && (
+                          <img
+                            src={CARRIER_LOGOS[carrierId]}
+                            alt={carrierName}
+                            className="earn-detail-logo"
+                          />
+                        )}
+                        {carrierName}
+                      </span>
+                    )}
                     <span className="earn-cb-date"> · {fmtDate(cb.chargebackedAt)}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -301,7 +301,7 @@ function ClientCard({ record, chargeback, onDelete, onEdit, onChargeback, onView
         </div>
         <div className="client-metric">
           <div className="client-metric-label">Annual Premium</div>
-          <div className="client-metric-value">{monthlyPrem ? fmt(monthlyPrem * 12) : '—'}</div>
+          <div className="client-metric-value" style={{ color: '#4caf84' }}>{monthlyPrem ? fmt(monthlyPrem * 12) : '—'}</div>
         </div>
         <div className="client-metric">
           <div className="client-metric-label">Advanced Agent Commission</div>

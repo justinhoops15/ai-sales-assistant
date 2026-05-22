@@ -3,6 +3,7 @@ import AgentSetup          from './components/AgentSetup.jsx'
 import Clients             from './components/Clients.jsx'
 import Dashboard           from './components/Dashboard.jsx'
 import Earnings            from './components/Earnings.jsx'
+import Settings           from './components/Settings.jsx'
 import FollowUp            from './components/FollowUp.jsx'
 import FollowUpModal       from './components/FollowUpModal.jsx'
 import ProgressBar         from './components/ProgressBar.jsx'
@@ -36,7 +37,7 @@ function initForm() {
     clientInfo: {
       firstName: '', lastName: '', age: '', sex: '',
       state: '',
-      dateOfBirth: '', phoneNumber: '',
+      dateOfBirth: '', phoneNumber: '', clientEmail: '',
       maritalStatus: '', spouseName: '',
       beneficiaries: [{ name: '', relationship: '', percentage: '100' }],
       tobacco: false, tobaccoType: '',
@@ -131,6 +132,7 @@ export default function App() {
   const [showClients,        setShowClients]        = useState(false)
   const [showFollowUps,      setShowFollowUps]      = useState(false)
   const [showEarnings,       setShowEarnings]       = useState(false)
+  const [showSettings,       setShowSettings]       = useState(false)
   const [highlightClientId,  setHighlightClientId]  = useState(null)
   const [step,               setStep]               = useState(1)
   const [formData,           setFormData]           = useState(initForm)
@@ -264,6 +266,7 @@ export default function App() {
     setShowClients(false)
     setShowFollowUps(false)
     setShowEarnings(false)
+    setShowSettings(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -280,6 +283,7 @@ export default function App() {
         state:           clientRecord.clientState      || '',
         dateOfBirth:     clientRecord.clientDOB        || '',
         phoneNumber:     clientRecord.clientPhone      || '',
+        clientEmail:     clientRecord.clientEmail     || '',
         maritalStatus:   clientRecord.maritalStatus    || '',
         spouseName:      clientRecord.spouseName       || '',
         beneficiaries:   clientRecord.beneficiaries?.length
@@ -571,8 +575,8 @@ export default function App() {
     allGraded2,
   } : null
 
-  const sidebarActiveView  = showFollowUps ? 'followups' : showEarnings ? 'earnings' : showClients ? 'clients' : showDashboard ? 'dashboard' : 'appointment'
-  const sidebarCurrentStep = (!showDashboard && !showClients && !showFollowUps && !showEarnings && appScreen === null && step >= 1) ? step : null
+  const sidebarActiveView  = showFollowUps ? 'followups' : showEarnings ? 'earnings' : showSettings ? 'settings' : showClients ? 'clients' : showDashboard ? 'dashboard' : 'appointment'
+  const sidebarCurrentStep = (!showDashboard && !showClients && !showFollowUps && !showEarnings && !showSettings && appScreen === null && step >= 1) ? step : null
 
   function handleGoToClients() {
     setShowClients(true)
@@ -629,14 +633,15 @@ export default function App() {
 
   // True when user is in a new appointment flow (not editing from clients/followups)
   function isInNewApptFlow() {
-    return !showDashboard && !showClients && !showFollowUps && !showEarnings && !appointmentModal
+    return !showDashboard && !showClients && !showFollowUps && !showEarnings && !showSettings && !appointmentModal
   }
 
   function doNavigate(view) {
-    if (view === 'dashboard')   { setShowDashboard(true);  setShowClients(false); setShowFollowUps(false); setShowEarnings(false); setAppScreen(null) }
-    if (view === 'clients')     { setShowClients(true);    setShowDashboard(false); setShowFollowUps(false); setShowEarnings(false); setHighlightClientId(null); setAppScreen(null) }
-    if (view === 'followups')   { setShowFollowUps(true);  setShowDashboard(false); setShowClients(false);  setShowEarnings(false); setAppScreen(null) }
-    if (view === 'earnings')    { setShowEarnings(true);   setShowDashboard(false); setShowClients(false);  setShowFollowUps(false); setAppScreen(null) }
+    if (view === 'dashboard')   { setShowDashboard(true);  setShowClients(false); setShowFollowUps(false); setShowEarnings(false); setShowSettings(false); setAppScreen(null) }
+    if (view === 'clients')     { setShowClients(true);    setShowDashboard(false); setShowFollowUps(false); setShowEarnings(false); setShowSettings(false); setHighlightClientId(null); setAppScreen(null) }
+    if (view === 'followups')   { setShowFollowUps(true);  setShowDashboard(false); setShowClients(false);  setShowEarnings(false); setShowSettings(false); setAppScreen(null) }
+    if (view === 'earnings')    { setShowEarnings(true);   setShowDashboard(false); setShowClients(false);  setShowFollowUps(false); setShowSettings(false); setAppScreen(null) }
+    if (view === 'settings')    { setShowSettings(true);   setShowDashboard(false); setShowClients(false);  setShowFollowUps(false); setShowEarnings(false); setAppScreen(null) }
     if (view === 'appointment') { handleNewAppointment() }
   }
 
@@ -829,6 +834,28 @@ export default function App() {
             onBack={() => setShowFollowUp(false)}
           />
         )}
+      </div>
+    )
+  }
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+  if (showSettings) {
+    return (
+      <div className="app">
+        <Sidebar
+          agentInfo={agentInfo}
+          activeView={sidebarActiveView}
+          currentStep={sidebarCurrentStep}
+          onNavigate={handleSidebarNavigate}
+          onChangeAgent={handleChangeAgent}
+          followUpCount={followUpCount}
+        />
+        <div className="app-body">
+          <FloatingAgentBadge agentInfo={agentInfo} />
+          <main className="app-main">
+            <Settings agentInfo={agentInfo} />
+          </main>
+        </div>
       </div>
     )
   }
