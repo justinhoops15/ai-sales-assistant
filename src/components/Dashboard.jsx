@@ -89,6 +89,10 @@ function saveScheduled(list) {
   localStorage.setItem('scheduled_appointments', JSON.stringify(list))
 }
 
+function loadContracting() {
+  try { return JSON.parse(localStorage.getItem('contracting') || '{}') } catch { return {} }
+}
+
 // ── Date helpers ────────────────────────────────────────────────────────────
 function isFuture(appt) {
   if (!appt.date) return false
@@ -665,14 +669,22 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
     return ids.size
   }, [soldAppts, followUpAppts, reachedResults])
 
-  // Fix 5: All-time AP and commission
-  const agentLevel = agentInfo?.contractLevel ?? 100
-  const allTimeAP   = soldAppts.reduce((s, a) => s + (parseFloat(a.monthlyPremium) || 0) * 12, 0)
+  // All-time AP
+  const allTimeAP = soldAppts.reduce((s, a) => s + (parseFloat(a.monthlyPremium) || 0) * 12, 0)
+
+  // Commission Paid — only policies with policyStatus === 'paid'
+  // Formula: IP × 75% × agentCompPct (non-Ethos) or IP × 100% × agentCompPct (Ethos)
+  // agentCompPct is read from contracting localStorage, falling back to agentInfo.contractLevel
+  const contracting  = loadContracting()
+  const agentCompPct = parseFloat(
+    contracting?.compTier || contracting?.compensationTier ||
+    agentInfo?.contractLevel || 100
+  )
   const allTimeComm = soldAppts.reduce((s, a) => {
-    const ap  = (parseFloat(a.monthlyPremium) || 0) * 12
-    const pct = (a.commissionPct > 0 ? a.commissionPct : agentLevel)
-    const fac = a.carrierId === 'ETHOS' ? 1 : 9 / 12
-    return s + ap * (pct / 100) * fac
+    if (a.policyStatus !== 'paid') return s
+    const ip        = (parseFloat(a.monthlyPremium) || 0) * 12
+    const advFactor = a.carrierId === 'ETHOS' ? 1.0 : 0.75
+    return s + ip * advFactor * (agentCompPct / 100)
   }, 0)
 
   const chartData = useMemo(() =>
