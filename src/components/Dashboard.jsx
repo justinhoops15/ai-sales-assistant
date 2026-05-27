@@ -669,8 +669,16 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
     return ids.size
   }, [soldAppts, followUpAppts, reachedResults])
 
-  // All-time AP
+  // All-time AP — gross submitted, every policy regardless of status
   const allTimeAP = soldAppts.reduce((s, a) => s + (parseFloat(a.monthlyPremium) || 0) * 12, 0)
+
+  // All-time IP — only approved or paid policies (issued by carrier)
+  // Old records without policyStatus default to approved for backward compatibility
+  const allTimeIP = soldAppts.reduce((s, a) => {
+    const st = a.policyStatus
+    if (st === 'underwriting' || st === 'denied') return s
+    return s + (parseFloat(a.monthlyPremium) || 0) * 12
+  }, 0)
 
   // Commission Paid — only policies with policyStatus === 'paid'
   // Formula: IP × 75% × agentCompPct (non-Ethos) or IP × 100% × agentCompPct (Ethos)
@@ -724,12 +732,12 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
     setShowApptForm(false)
   }
 
-  // Stat boxes with per-box colors (Fix 3)
+  // Stat boxes
   const STATS = [
-    { label: 'Total Appointments', value: total,            color: '#ffffff', clickable: false },
-    { label: 'Annual Premium',     value: fmt(allTimeAP),   color: '#4caf84', clickable: false },
-    { label: 'Commission Paid',    value: fmt(allTimeComm), color: '#22d3ee', clickable: false },
-    { label: 'Policies Sold',      value: policiesSold,     color: '#7c3aed', clickable: true  },
+    { label: 'Annual Premium',      value: fmt(allTimeAP),   color: '#4caf84', clickable: false },
+    { label: 'Initiated Premium',   value: fmt(allTimeIP),   color: '#7c3aed', clickable: false },
+    { label: 'Commission Paid',     value: fmt(allTimeComm), color: '#22d3ee', clickable: false },
+    { label: 'Policies Sold',       value: policiesSold,     color: '#ffffff', clickable: true  },
   ]
 
   return (
