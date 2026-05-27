@@ -28,6 +28,22 @@ function saveAppointments(records) {
   try { localStorage.setItem('ffl_appointments', JSON.stringify(records)) } catch {}
 }
 
+/** Convert MM/DD/YYYY → YYYY-MM-DD for <input type="date"> */
+function mdyToIso(str) {
+  if (!str) return ''
+  const [m, d, y] = str.split('/')
+  if (!m || !d || !y) return ''
+  return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`
+}
+
+/** Convert YYYY-MM-DD → MM/DD/YYYY */
+function isoToMdy(str) {
+  if (!str) return ''
+  const [y, m, d] = str.split('-')
+  if (!y || !m || !d) return ''
+  return `${m}/${d}/${y}`
+}
+
 /** Parse MM/DD/YYYY → Date (midnight local) */
 function parseMDY(str) {
   if (!str) return null
@@ -249,17 +265,169 @@ function ClientViewDetailsModal({ record, chargeback, onClose }) {
   )
 }
 
+/* ── Denied Modal ────────────────────────────────────────────────────────── */
+function DeniedModal({ record, onReenter, onClose }) {
+  return (
+    <div className="db-overlay" onClick={onClose}>
+      <div className="db-modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+        <div className="db-modal-head">
+          <h2 className="db-modal-title" style={{ color: '#3b82f6' }}>Policy Denied</h2>
+          <button className="db-modal-close" onClick={onClose}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+            </svg>
+          </button>
+        </div>
+        <div style={{ padding: '20px 24px 24px' }}>
+          <p style={{ fontSize: 14, color: '#888888', marginBottom: 20, lineHeight: 1.65 }}>
+            This policy was denied for <strong style={{ color: '#ffffff' }}>{record.clientName}</strong>.
+            Would you like to re-enter the appointment flow to find a new carrier and product for this client?
+          </p>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="db-btn-cancel" style={{ flex: 1 }} onClick={onClose}>Close</button>
+            <button
+              className="db-btn-save"
+              style={{ flex: 2, background: 'rgba(59,130,246,0.15)', borderColor: 'rgba(59,130,246,0.4)', color: '#3b82f6' }}
+              onClick={() => { onReenter(record); onClose() }}
+            >
+              Re-enter Appointment Flow
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Status Confirmation Modal ───────────────────────────────────────────── */
+const STATUS_DISPLAY = {
+  approved:     'Approved',
+  underwriting: 'Underwriting',
+  denied:       'Denied',
+  paid:         'Paid',
+}
+
+function StatusConfirmModal({ statusId, onConfirm, onCancel }) {
+  return (
+    <div className="db-overlay" onClick={onCancel}>
+      <div className="db-modal" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
+        <div className="db-modal-head">
+          <h2 className="db-modal-title">Confirm Status Change</h2>
+          <button className="db-modal-close" onClick={onCancel}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+            </svg>
+          </button>
+        </div>
+        <div style={{ padding: '20px 24px 24px' }}>
+          <p style={{ fontSize: 14, color: '#888888', marginBottom: 20, lineHeight: 1.65 }}>
+            Are you sure you want to mark this policy as{' '}
+            <strong style={{ color: '#ffffff' }}>{STATUS_DISPLAY[statusId] || statusId}</strong>?
+          </p>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="db-btn-cancel" style={{ flex: 1 }} onClick={onCancel}>Cancel</button>
+            <button
+              className="db-btn-save"
+              style={{ flex: 2, background: 'rgba(34,211,238,0.15)', borderColor: 'rgba(34,211,238,0.4)', color: '#22d3ee' }}
+              onClick={onConfirm}
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Policy Status Buttons ───────────────────────────────────────────────── */
+function PolicyStatusRow({ status, onSetStatus }) {
+  const [pendingStatus, setPendingStatus] = useState(null)
+
+  const btns = [
+    { id: 'approved',     label: 'Approved',     activeColor: '#4caf84', activeBg: 'rgba(76,175,132,0.15)',  activeBorder: 'rgba(76,175,132,0.45)' },
+    { id: 'underwriting', label: 'Underwriting', activeColor: '#f59e0b', activeBg: 'rgba(245,158,11,0.12)',  activeBorder: 'rgba(245,158,11,0.45)' },
+    { id: 'denied',       label: 'Denied',       activeColor: '#3b82f6', activeBg: 'rgba(59,130,246,0.12)',  activeBorder: 'rgba(59,130,246,0.45)' },
+    { id: 'paid',         label: 'Paid',         activeColor: '#4caf84', activeBg: 'rgba(76,175,132,0.2)',   activeBorder: 'rgba(76,175,132,0.6)'  },
+  ]
+
+  function handleConfirm() {
+    onSetStatus(pendingStatus)
+    setPendingStatus(null)
+  }
+
+  return (
+    <div className="client-status-row">
+      {btns.map(btn => {
+        // Paid implies Approved — both buttons appear active when status is 'paid'
+        const isActive = status === btn.id || (status === 'paid' && btn.id === 'approved')
+        return (
+          <button
+            key={btn.id}
+            className={`client-status-btn${isActive ? ' active' : ''}`}
+            style={isActive ? { color: btn.activeColor, background: btn.activeBg, borderColor: btn.activeBorder } : {}}
+            onClick={() => setPendingStatus(btn.id)}
+          >
+            {btn.label}
+          </button>
+        )
+      })}
+
+      {pendingStatus !== null && (
+        <StatusConfirmModal
+          statusId={pendingStatus}
+          onConfirm={handleConfirm}
+          onCancel={() => setPendingStatus(null)}
+        />
+      )}
+    </div>
+  )
+}
+
 /* ── Single Client Card ──────────────────────────────────────────────────── */
-function ClientCard({ record, chargeback, onDelete, onEdit, onChargeback, onViewDetails }) {
+function ClientCard({ record, chargeback, onDelete, onEdit, onChargeback, onViewDetails, onUpdateStatus, onShowDeniedModal, onUpdateEnforced }) {
   const leadColor    = LEAD_COLORS[record.leadType] || LEAD_COLORS.final_expense
   const monthlyPrem  = parseFloat(record.monthlyPremium) || 0
   const commPct      = record.commissionPct || 0
   const advanceComm  = calcAdvanceComm(monthlyPrem, commPct, record.carrierId)
   const isCharged    = !!chargeback
   const chargebackMonth = chargeback?.monthAtChargeback ?? null
+  const policyStatus = record.policyStatus || null
+
+  // Inline enforced-date editing
+  const [editingEnforced, setEditingEnforced] = useState(false)
+  const [draftEnforced,   setDraftEnforced]   = useState('')
+
+  function startEditEnforced() {
+    setDraftEnforced(mdyToIso(record.dateEnforced))
+    setEditingEnforced(true)
+  }
+  function saveEnforced() {
+    if (draftEnforced) onUpdateEnforced?.(record.id, isoToMdy(draftEnforced))
+    setEditingEnforced(false)
+  }
+  function cancelEditEnforced() {
+    setEditingEnforced(false)
+  }
+
+  // Card border class based on status
+  let statusClass = ''
+  if (policyStatus === 'underwriting') statusClass = ' client-card-underwriting'
+  else if (policyStatus === 'denied')  statusClass = ' client-card-denied'
+  else if (policyStatus === 'paid')    statusClass = ' client-card-paid'
+
+  function handleStatusChange(newStatus) {
+    // If denying and was not previously denied, show the denied modal
+    if (newStatus === 'denied' && policyStatus !== 'denied') {
+      onUpdateStatus(record.id, 'denied')
+      onShowDeniedModal(record)
+    } else {
+      onUpdateStatus(record.id, newStatus)
+    }
+  }
 
   return (
-    <div className={`client-card${isCharged ? ' client-card-cb' : ''}`}>
+    <div className={`client-card${isCharged ? ' client-card-cb' : ''}${statusClass}`}>
 
       {/* Card header */}
       <div className="client-card-header">
@@ -313,7 +481,42 @@ function ClientCard({ record, chargeback, onDelete, onEdit, onChargeback, onView
       <div className="client-dates-row">
         <span className="client-date-item">
           <span className="client-date-label">Date Enforced</span>
-          <span className="client-date-val">{record.dateEnforced || '—'}</span>
+          {editingEnforced ? (
+            <span className="client-date-edit-row">
+              <input
+                type="date"
+                className="client-date-input"
+                value={draftEnforced}
+                onChange={e => setDraftEnforced(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter')  saveEnforced()
+                  if (e.key === 'Escape') cancelEditEnforced()
+                }}
+                autoFocus
+              />
+              <button className="client-date-confirm" onClick={saveEnforced} title="Save date">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="1.5 6 4.5 9 9.5 2"/>
+                </svg>
+              </button>
+              <button className="client-date-cancel-btn" onClick={cancelEditEnforced} title="Cancel">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="1.5" y1="1.5" x2="8.5" y2="8.5"/><line x1="8.5" y1="1.5" x2="1.5" y2="8.5"/>
+                </svg>
+              </button>
+            </span>
+          ) : (
+            <span className="client-date-val-row">
+              <span className="client-date-val">{record.dateEnforced || '—'}</span>
+              {!isCharged && (
+                <button className="client-date-pencil" onClick={startEditEnforced} title="Edit enforced date">
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M7.5 1.5l2 2L2 11H0v-2L7.5 1.5Z"/>
+                  </svg>
+                </button>
+              )}
+            </span>
+          )}
         </span>
         <span className="client-date-item">
           <span className="client-date-label">Date Closed</span>
@@ -343,6 +546,9 @@ function ClientCard({ record, chargeback, onDelete, onEdit, onChargeback, onView
           <span className="client-cb-amount">−{fmt(chargeback.chargebackAmount)} owed back</span>
         </div>
       )}
+
+      {/* Policy Status Buttons */}
+      <PolicyStatusRow status={policyStatus} onSetStatus={handleStatusChange} />
 
       {/* Actions */}
       <div className="client-card-actions">
@@ -495,6 +701,25 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
   const [cbTarget,       setCbTarget]       = useState(null)  // record to chargeback
   const [deleteTarget,   setDeleteTarget]   = useState(null)  // record to delete (confirm)
   const [viewTarget,     setViewTarget]     = useState(null)  // chargebacked record to view (read-only)
+  const [deniedTarget,   setDeniedTarget]   = useState(null)  // denied modal target
+
+  // Update policy status on a client record
+  function updateStatus(id, newStatus) {
+    const updated = appointments.map(a =>
+      a.id === id ? { ...a, policyStatus: newStatus } : a
+    )
+    saveAppointments(updated)
+    setAppointments(updated)
+  }
+
+  // Update enforced date inline on a client card
+  function updateEnforced(id, newDate) {
+    const updated = appointments.map(a =>
+      a.id === id ? { ...a, dateEnforced: newDate } : a
+    )
+    saveAppointments(updated)
+    setAppointments(updated)
+  }
 
   // Escape key closes any open modal
   useEffect(() => {
@@ -503,10 +728,11 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
       if (viewTarget)   setViewTarget(null)
       if (cbTarget)     setCbTarget(null)
       if (deleteTarget) setDeleteTarget(null)
+      if (deniedTarget) setDeniedTarget(null)
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
-  }, [viewTarget, cbTarget, deleteTarget])
+  }, [viewTarget, cbTarget, deleteTarget, deniedTarget])
 
   // Scroll to highlighted card when navigated from Dashboard chart dot
   useEffect(() => {
@@ -579,6 +805,23 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
             const bDate = cbMap[b.id]?.chargebackedAt || b.savedAt
             return new Date(bDate) - new Date(aDate)
           })
+      case 'status_approved':
+        // Approved = explicit 'approved' OR no status set (legacy records default to approved)
+        return arr
+          .filter(r => !r.policyStatus || r.policyStatus === 'approved')
+          .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt))
+      case 'status_underwriting':
+        return arr
+          .filter(r => r.policyStatus === 'underwriting')
+          .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt))
+      case 'status_denied':
+        return arr
+          .filter(r => r.policyStatus === 'denied')
+          .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt))
+      case 'status_paid':
+        return arr
+          .filter(r => r.policyStatus === 'paid')
+          .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt))
       default: return arr
     }
   }, [filtered, sortKey, cbMap])
@@ -699,6 +942,11 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
           <option value="most_months">Most Months in Force</option>
           <option value="least_months">Least Months in Force</option>
           <option value="chargebacks">Chargebacks</option>
+          <option disabled>──────────────</option>
+          <option value="status_approved">Status: Approved</option>
+          <option value="status_underwriting">Status: Underwriting</option>
+          <option value="status_denied">Status: Denied</option>
+          <option value="status_paid">Status: Paid</option>
         </select>
       </div>
 
@@ -737,6 +985,9 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
                 onDelete={handleDelete}
                 onChargeback={handleChargeback}
                 onViewDetails={setViewTarget}
+                onUpdateStatus={updateStatus}
+                onShowDeniedModal={setDeniedTarget}
+                onUpdateEnforced={updateEnforced}
               />
             </div>
           ))}
@@ -790,6 +1041,15 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
           record={viewTarget}
           chargeback={cbMap[viewTarget.id] || null}
           onClose={() => setViewTarget(null)}
+        />
+      )}
+
+      {/* Denied modal */}
+      {deniedTarget && (
+        <DeniedModal
+          record={deniedTarget}
+          onReenter={onEdit}
+          onClose={() => setDeniedTarget(null)}
         />
       )}
     </div>

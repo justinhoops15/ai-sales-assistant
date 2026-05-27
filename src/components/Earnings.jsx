@@ -48,15 +48,40 @@ function fmtTickY(v) {
   return v > 0 ? `$${Math.round(v)}` : ''
 }
 
-// ── Commission / AP ───────────────────────────────────────────────────────────
+// ── localStorage contracting ──────────────────────────────────────────────────
+function loadContracting() {
+  try { return JSON.parse(localStorage.getItem('contracting') || '{}') } catch { return {} }
+}
+
+// ── AP / IP / Commission ──────────────────────────────────────────────────────
+// AP = every sold policy regardless of status (gross submitted premium)
+function calcAP(appt) {
+  return (parseFloat(appt.monthlyPremium) || 0) * 12
+}
+
+// IP = only approved or paid policies (issued by carrier)
+// Old records without policyStatus default to 'approved' for backward compatibility
+function calcIP(appt) {
+  const s = appt.policyStatus
+  if (s === 'underwriting' || s === 'denied') return 0
+  return calcAP(appt) // null/undefined/approved/paid all count
+}
+
+// New commission formula: IP × advanceFactor × agentCompPct%
+// Non-Ethos = 75% (9-month advance), Ethos = 100% (12-month advance)
+function calcCommissionNew(appt, agentCompPct) {
+  const ip = calcIP(appt)
+  if (ip === 0) return 0
+  const advFactor = appt.carrierId === 'ETHOS' ? 1.0 : 0.75
+  return ip * advFactor * (agentCompPct / 100)
+}
+
+// Legacy formula kept for backward-compat reference (unused in main calcs)
 function calcCommission(appt) {
-  const ap  = (parseFloat(appt.monthlyPremium) || 0) * 12
+  const ap  = calcAP(appt)
   const p   = appt.commissionPct || 0
   const fac = appt.carrierId === 'ETHOS' ? 1 : 9 / 12
   return ap * (p / 100) * fac
-}
-function calcAP(appt) {
-  return (parseFloat(appt.monthlyPremium) || 0) * 12
 }
 
 // ── Date helpers (Monday-based weeks) ────────────────────────────────────────
@@ -558,10 +583,15 @@ export default function Earnings({ onGoToClients }) {
   const [followUps]                     = useState(loadFollowUps)
   const [goals,        setGoals]        = useState(loadGoals)
   const [agent]                         = useState(loadAgent)
+  const [contracting]                   = useState(loadContracting)
   const [goalDraft,    setGoalDraft]    = useState(null)
-  const [expandedStats, setExpandedStats] = useState([false, false, false, false])
-  const [statFilters,   setStatFilters]   = useState(['all', 'all', 'all', 'all'])
+  // 5 boxes: 0=AP, 1=IP, 2=Commission, 3=Chargebacks, 4=Net
+  const [expandedStats, setExpandedStats] = useState([false, false, false, false, false])
+  const [statFilters,   setStatFilters]   = useState(['all', 'all', 'all', 'all', 'all'])
   const [payTarget,    setPayTarget]    = useState(null)
+
+  // Agent comp% — from contracting settings, falling back to agent profile
+  const agentCompPct = parseFloat(contracting?.compTier || contracting?.compensationTier || agent?.contractLevel || 100)
 
   // ── Chargeback lookup ──────────────────────────────────────────────────────
   const cbMap = useMemo(() => {
@@ -570,17 +600,23 @@ export default function Earnings({ onGoToClients }) {
     return m
   }, [chargebacks])
 
-  // ── Commission / AP helpers ────────────────────────────────────────────────
+  // ── AP / IP / Commission helpers ──────────────────────────────────────────
   function apptForPeriod(period) {
     return filterPeriod(appointments, period)
   }
-  function totalCommForPeriod(period) {
-    return apptForPeriod(period).reduce((s, a) => s + calcCommission(a), 0)
-  }
+  // Box 0: Submitted AP — all sold policies, gross, no deductions
   function submittedAPForPeriod(period) {
     return apptForPeriod(period).reduce((s, a) => s + calcAP(a), 0)
   }
-  // Outstanding chargeback losses (owed - paid) for display
+  // Box 1: Initiated Premium — approved/paid only
+  function ipForPeriod(period) {
+    return apptForPeriod(period).reduce((s, a) => s + calcIP(a), 0)
+  }
+  // Box 2: Commission — IP-based new formula
+  function totalCommForPeriod(period) {
+    return apptForPeriod(period).reduce((s, a) => s + calcCommissionNew(a, agentCompPct), 0)
+  }
+  // Chargeback outstanding (owed - paid)
   function cbOutstandingForPeriod(period) {
     return filterPeriod(chargebacks, period, 'chargebackedAt')
       .reduce((s, cb) => {
@@ -588,7 +624,7 @@ export default function Earnings({ onGoToClients }) {
         return s + Math.max(0, (cb.chargebackAmount || 0) - paid)
       }, 0)
   }
-  // Full chargeback deduction from net (resolution never changes this)
+  // Full chargeback deduction from net
   function cbTotalForPeriod(period) {
     return filterPeriod(chargebacks, period, 'chargebackedAt')
       .reduce((s, cb) => s + (cb.chargebackAmount || 0), 0)
@@ -734,42 +770,68 @@ export default function Earnings({ onGoToClients }) {
     setExpandedStats(prev => prev.map((v, i) => i === idx ? !v : v))
   }
 
-  // ── Box 0: Commission breakdown by policy (with commissionPct) ─────────────
-  const commByPolicy = useMemo(() => {
+  // Parse MM/DD/YYYY enforced-date string → timestamp for sorting
+  function parseDateEnforced(str) {
+    if (!str) return 0
+    const [m, d, y] = str.split('/')
+    if (!m || !d || !y) return 0
+    return new Date(Number(y), Number(m) - 1, Number(d)).getTime()
+  }
+
+  // ── Box 0: Submitted AP — all policies, most recent first ─────────────────
+  const submittedPolicies = useMemo(() => {
     return filterPeriod(appointments, sf[0])
-      .sort((a, b) => calcCommission(b) - calcCommission(a))
+      .slice()
+      .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointments, sf[0]])
 
-  // ── Box 1: All submitted policies for period ──────────────────────────────
-  const submittedPolicies = useMemo(() => {
+  // ── Box 1: IP policies — most recent enforced date first ──────────────────
+  const ipPolicies = useMemo(() => {
     return filterPeriod(appointments, sf[1])
+      .filter(a => { const s = a.policyStatus; return !s || s === 'approved' || s === 'paid' })
+      .slice()
+      .sort((a, b) => parseDateEnforced(b.dateEnforced) - parseDateEnforced(a.dateEnforced)
+                    || new Date(b.savedAt) - new Date(a.savedAt))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointments, cbMap, sf[1]])
+  }, [appointments, sf[1]])
 
-  // ── Box 2: Chargebacks for period ────────────────────────────────────────
+  // ── Box 2: Commission — only policies with commission > 0, enforced date desc ─
+  const commByPolicy = useMemo(() => {
+    return filterPeriod(appointments, sf[2])
+      .filter(a => calcCommissionNew(a, agentCompPct) > 0)
+      .slice()
+      .sort((a, b) => parseDateEnforced(b.dateEnforced) - parseDateEnforced(a.dateEnforced)
+                    || new Date(b.savedAt) - new Date(a.savedAt))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointments, sf[2], agentCompPct])
+
+  // ── Box 3: Chargebacks — most recent chargeback date first ────────────────
   const cbFiltered = useMemo(() => {
-    return filterPeriod(chargebacks, sf[2], 'chargebackedAt')
+    return filterPeriod(chargebacks, sf[3], 'chargebackedAt')
+      .slice()
+      .sort((a, b) => new Date(b.chargebackedAt) - new Date(a.chargebackedAt))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chargebacks, sf[2]])
+  }, [chargebacks, sf[3]])
 
-  // ── Box 3: Net breakdown ──────────────────────────────────────────────────
+  // ── Box 4: Net breakdown ───────────────────────────────────────────────────
   const netBreakdown = useMemo(() => {
-    const period = sf[3]
+    const period = sf[4]
     const gross  = totalCommForPeriod(period)
     const losses = cbTotalForPeriod(period)
     const net    = gross - losses
     return { gross, losses, net }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointments, chargebacks, sf[3]])
+  }, [appointments, chargebacks, sf[4]])
 
   // ── All-time header stats ─────────────────────────────────────────────────
   const totalAP     = appointments.reduce((s, a) => s + calcAP(a), 0)
-  const totalComm   = appointments.reduce((s, a) => s + calcCommission(a), 0)
+  const totalIP     = appointments.reduce((s, a) => s + calcIP(a), 0)
+  const totalComm   = appointments.reduce((s, a) => s + calcCommissionNew(a, agentCompPct), 0)
   const totalCBLoss = chargebacks.reduce((s, cb) => s + (cb.chargebackAmount || 0), 0)
 
-  // Agent commission %
-  const agentCommPct = agent?.contractLevel ? `${agent.contractLevel}%` : null
+  // Display label for agent comp
+  const agentCompLabel = `${agentCompPct}%`
 
   // Stats grid items
   const weeklyStats = [
@@ -799,7 +861,8 @@ export default function Earnings({ onGoToClients }) {
         <div className="earn-eyebrow">Financial Performance</div>
         <h1 className="earn-title">Earnings</h1>
         <p className="earn-subtitle">
-          Submitted AP: <span style={{ color: '#4caf84' }}>{fmt(totalAP)}</span>
+          AP: <span style={{ color: '#4caf84' }}>{fmt(totalAP)}</span>
+          {' · '}IP: <span style={{ color: '#7c3aed' }}>{fmt(totalIP)}</span>
           {' · '}Commission: <span className="earn-hi">{fmt(totalComm)}</span>
           {totalCBLoss > 0 && (
             <> · Chargebacks: <span className="earn-danger">{fmt(totalCBLoss)}</span></>
@@ -807,69 +870,21 @@ export default function Earnings({ onGoToClients }) {
         </p>
       </div>
 
-      {/* ── 4 Stat Boxes ── */}
+      {/* ── 5 Stat Boxes ── */}
       <div className="earn-stat-grid">
 
-        {/* 0: Commission Earned */}
+        {/* 0: Submitted AP */}
         <StatBox
-          title="Commission Earned"
-          value={fmt(totalCommForPeriod(sf[0]))}
-          subtitle={agentCommPct
-            ? `Paid at ${agentCommPct} commission · 9-month advance basis`
-            : '9-month advance basis'}
-          color="#22d3ee"
+          title="Submitted Annual Premium"
+          value={fmt(submittedAPForPeriod(sf[0]))}
+          subtitle={`${submittedPolicies.length} ${submittedPolicies.length === 1 ? 'policy' : 'policies'} submitted`}
+          color="#4caf84"
           expanded={expandedStats[0]}
           onToggle={() => toggleStat(0)}
           filter={sf[0]}
           onFilter={v => setStatFilter(0, v)}
         >
-          <div className="earn-detail-label">Commission by policy</div>
-          {commByPolicy.length === 0
-            ? <div className="earn-detail-empty">No policies this period.</div>
-            : commByPolicy.map(a => (
-              <div key={a.id} className="earn-detail-row">
-                <div className="earn-detail-key">
-                  {a.clientName || 'Unknown'}
-                  <span className="earn-detail-carrier">
-                    {' · '}
-                    {CARRIER_LOGOS[a.carrierId] && (
-                      <img
-                        src={CARRIER_LOGOS[a.carrierId]}
-                        alt={a.carrier}
-                        className="earn-detail-logo"
-                      />
-                    )}
-                    {a.carrier}
-                  </span>
-                  {a.dateEnforced && (
-                    <span className="earn-enforced-date"> · Enforced: {a.dateEnforced}</span>
-                  )}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {a.commissionPct > 0 && (
-                    <span style={{ fontSize: 11, color: '#555' }}>{a.commissionPct}%</span>
-                  )}
-                  <span className="earn-detail-val" style={{ color: '#22d3ee' }}>
-                    {fmt(calcCommission(a))}
-                  </span>
-                </div>
-              </div>
-            ))
-          }
-        </StatBox>
-
-        {/* 1: Submitted Annual Premium */}
-        <StatBox
-          title="Submitted Annual Premium"
-          value={fmt(submittedAPForPeriod(sf[1]))}
-          subtitle={`${submittedPolicies.length} ${submittedPolicies.length === 1 ? 'policy' : 'policies'} submitted`}
-          color="#4caf84"
-          expanded={expandedStats[1]}
-          onToggle={() => toggleStat(1)}
-          filter={sf[1]}
-          onFilter={v => setStatFilter(1, v)}
-        >
-          <div className="earn-detail-label">All submitted policies — gross AP (chargebacks tracked separately)</div>
+          <div className="earn-detail-label">All submitted policies — gross AP</div>
           {submittedPolicies.length === 0
             ? <div className="earn-detail-empty">No policies submitted this period.</div>
             : submittedPolicies.map(a => (
@@ -879,33 +894,105 @@ export default function Earnings({ onGoToClients }) {
                   <span className="earn-detail-carrier">
                     {' · '}
                     {CARRIER_LOGOS[a.carrierId] && (
-                      <img
-                        src={CARRIER_LOGOS[a.carrierId]}
-                        alt={a.carrier}
-                        className="earn-detail-logo"
-                      />
+                      <img src={CARRIER_LOGOS[a.carrierId]} alt={a.carrier} className="earn-detail-logo" />
                     )}
                     {a.carrier}
                   </span>
+                  {a.savedAt && (
+                    <span className="earn-enforced-date"> · {fmtDate(a.savedAt)}</span>
+                  )}
                 </div>
-                <span className="earn-detail-val" style={{ color: '#4caf84' }}>
-                  {fmt(calcAP(a))}
-                </span>
+                <span className="earn-detail-val" style={{ color: '#4caf84' }}>{fmt(calcAP(a))}</span>
               </div>
             ))
           }
         </StatBox>
 
-        {/* 2: Chargeback Losses */}
+        {/* 1: Initiated Premium (IP) */}
         <StatBox
-          title="Chargeback Losses"
-          value={fmt(cbOutstandingForPeriod(sf[2]))}
-          subtitle={`${cbFiltered.length} chargeback${cbFiltered.length !== 1 ? 's' : ''} this period`}
-          color="#e05c5c"
+          title="Initiated Premium (IP)"
+          value={fmt(ipForPeriod(sf[1]))}
+          subtitle={`${ipPolicies.length} ${ipPolicies.length === 1 ? 'policy' : 'policies'} approved / issued`}
+          color="#7c3aed"
+          expanded={expandedStats[1]}
+          onToggle={() => toggleStat(1)}
+          filter={sf[1]}
+          onFilter={v => setStatFilter(1, v)}
+        >
+          <div className="earn-detail-label">Approved and issued policies</div>
+          {ipPolicies.length === 0
+            ? <div className="earn-detail-empty">No approved policies this period. Mark policies as Approved on client cards.</div>
+            : ipPolicies.map(a => (
+              <div key={a.id} className="earn-detail-row">
+                <div className="earn-detail-key">
+                  {a.clientName || 'Unknown'}
+                  <span className="earn-detail-carrier">
+                    {' · '}
+                    {CARRIER_LOGOS[a.carrierId] && (
+                      <img src={CARRIER_LOGOS[a.carrierId]} alt={a.carrier} className="earn-detail-logo" />
+                    )}
+                    {a.carrier}
+                  </span>
+                  {a.dateEnforced && (
+                    <span className="earn-enforced-date"> · Enforced: {a.dateEnforced}</span>
+                  )}
+                </div>
+                <span className="earn-detail-val" style={{ color: '#22d3ee' }}>{fmt(calcAP(a))}</span>
+              </div>
+            ))
+          }
+        </StatBox>
+
+        {/* 2: Commission Earned */}
+        <StatBox
+          title="Commission Earned"
+          value={fmt(totalCommForPeriod(sf[2]))}
+          subtitle={`${agentCompLabel} comp · IP×75% · Ethos: IP×100%`}
+          color="#22d3ee"
           expanded={expandedStats[2]}
           onToggle={() => toggleStat(2)}
           filter={sf[2]}
           onFilter={v => setStatFilter(2, v)}
+        >
+          <div className="earn-detail-label">Commission by policy (IP-based)</div>
+          {commByPolicy.length === 0
+            ? <div className="earn-detail-empty">No commission this period.</div>
+            : commByPolicy.map(a => {
+              const comm   = calcCommissionNew(a, agentCompPct)
+              const isPaid = a.policyStatus === 'paid'
+              return (
+                <div key={a.id} className="earn-detail-row">
+                  <div className="earn-detail-key">
+                    {a.clientName || 'Unknown'}
+                    <span className="earn-detail-carrier">
+                      {' · '}
+                      {CARRIER_LOGOS[a.carrierId] && (
+                        <img src={CARRIER_LOGOS[a.carrierId]} alt={a.carrier} className="earn-detail-logo" />
+                      )}
+                      {a.carrier}
+                    </span>
+                    {a.dateEnforced && (
+                      <span className="earn-enforced-date"> · Enforced: {a.dateEnforced}</span>
+                    )}
+                    {isPaid && <span className="earn-policy-paid-badge">Policy Paid</span>}
+                  </div>
+                  <span className="earn-detail-val" style={{ color: '#22d3ee' }}>{fmt(comm)}</span>
+                </div>
+              )
+            })
+          }
+        </StatBox>
+
+        {/* 3: Chargeback Losses */}
+        <StatBox
+          title="Chargeback Losses"
+          value={fmt(cbOutstandingForPeriod(sf[3]))}
+          subtitle={`${cbFiltered.length} chargeback${cbFiltered.length !== 1 ? 's' : ''} this period`}
+          color="#e05c5c"
+          expanded={expandedStats[3]}
+          onToggle={() => toggleStat(3)}
+          filter={sf[3]}
+          onFilter={v => setStatFilter(3, v)}
         >
           <div className="earn-detail-label">Chargeback details</div>
           {cbFiltered.length === 0
@@ -917,7 +1004,6 @@ export default function Earnings({ onGoToClients }) {
                 : (cb.amountPaidBack || 0)
               const outstanding = Math.max(0, (cb.chargebackAmount || 0) - totalPaid)
               const isResolved  = totalPaid >= (cb.chargebackAmount || 0)
-              // Look up carrier info from parent appointment
               const appt = appointments.find(a => a.id === cb.clientId)
               const carrierId   = appt?.carrierId || cb.carrierId || null
               const carrierName = appt?.carrier   || cb.carrier   || null
@@ -929,11 +1015,7 @@ export default function Earnings({ onGoToClients }) {
                       <span className="earn-detail-carrier">
                         {' · '}
                         {carrierId && CARRIER_LOGOS[carrierId] && (
-                          <img
-                            src={CARRIER_LOGOS[carrierId]}
-                            alt={carrierName}
-                            className="earn-detail-logo"
-                          />
+                          <img src={CARRIER_LOGOS[carrierId]} alt={carrierName} className="earn-detail-logo" />
                         )}
                         {carrierName}
                       </span>
@@ -953,20 +1035,23 @@ export default function Earnings({ onGoToClients }) {
           }
         </StatBox>
 
-        {/* 3: Net Earnings */}
+      </div>{/* end earn-stat-grid (4 boxes) */}
+
+      {/* ── Net Earnings — centered on its own row below Commission + Chargebacks ── */}
+      <div className="earn-net-centered-row">
         <StatBox
           title="Net Earnings"
-          value={fmt(netForPeriod(sf[3]))}
+          value={fmt(netForPeriod(sf[4]))}
           subtitle="Commission minus all chargeback amounts"
-          color={netForPeriod(sf[3]) >= 0 ? '#a78bfa' : '#e05c5c'}
-          expanded={expandedStats[3]}
-          onToggle={() => toggleStat(3)}
-          filter={sf[3]}
-          onFilter={v => setStatFilter(3, v)}
+          color={netForPeriod(sf[4]) >= 0 ? '#f97316' : '#e05c5c'}
+          expanded={expandedStats[4]}
+          onToggle={() => toggleStat(4)}
+          filter={sf[4]}
+          onFilter={v => setStatFilter(4, v)}
         >
           <div className="earn-net-breakdown">
             <div className="earn-net-row">
-              <span>Gross Commission</span>
+              <span>Commission (IP-based)</span>
               <span style={{ color: '#22d3ee' }}>{fmt(netBreakdown.gross)}</span>
             </div>
             <div className="earn-net-row">
@@ -976,7 +1061,7 @@ export default function Earnings({ onGoToClients }) {
             <div className="earn-net-divider" />
             <div className="earn-net-row earn-net-total">
               <span>Net</span>
-              <span style={{ color: netBreakdown.net >= 0 ? '#a78bfa' : '#e05c5c' }}>
+              <span style={{ color: netBreakdown.net >= 0 ? '#f97316' : '#e05c5c' }}>
                 {fmt(netBreakdown.net)}
               </span>
             </div>
