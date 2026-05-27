@@ -3290,8 +3290,8 @@ textarea.field-input {
 
 .db-stat-link-hint {
   font-size: 11px;
-  color: #7c3aed;
-  opacity: 0.85;
+  color: #ffffff;
+  opacity: 0.5;
   margin-top: 4px;
   display: block;
 }
