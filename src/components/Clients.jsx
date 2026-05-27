@@ -20,6 +20,10 @@ function loadChargebacks() {
   try { return JSON.parse(localStorage.getItem('chargeback_records') || '[]') } catch { return [] }
 }
 
+function loadContracting() {
+  try { return JSON.parse(localStorage.getItem('contracting') || '{}') } catch { return {} }
+}
+
 function saveChargebacks(records) {
   try { localStorage.setItem('chargeback_records', JSON.stringify(records)) } catch {}
 }
@@ -870,7 +874,24 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
   }
 
   // Summary stats
-  const totalAnnualPremium = appointments.reduce((sum, r) => sum + (parseFloat(r.monthlyPremium) || 0) * 12, 0)
+  // Advanced Commission = IP × advance factor × agent comp%
+  //   Non-Ethos: IP × 75% × comp% (9-month advance)
+  //   Ethos:     IP × 100% × comp% (12-month advance — full annual upfront)
+  // Only approved or paid policies count as IP.
+  const contracting = loadContracting()
+  const agentCompPct = parseFloat(
+    contracting?.compTier || contracting?.compensationTier ||
+    (typeof appointments[0]?.commissionPct === 'number' ? null : null) ||
+    100
+  )
+  const totalAdvancedCommission = appointments.reduce((sum, r) => {
+    const s = r.policyStatus
+    // Only approved or paid policies have IP
+    if (s === 'underwriting' || s === 'denied') return sum
+    const ip         = (parseFloat(r.monthlyPremium) || 0) * 12
+    const advFactor  = r.carrierId === 'ETHOS' ? 1.0 : 0.75
+    return sum + ip * advFactor * (agentCompPct / 100)
+  }, 0)
   const totalCommission    = appointments.reduce((sum, r) => {
     const ap  = (parseFloat(r.monthlyPremium) || 0) * 12
     const pct = r.commissionPct || 0
@@ -898,8 +919,8 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
             <div className="clients-stat-label">Policies Sold</div>
           </div>
           <div className="clients-stat">
-            <div className="clients-stat-num" style={{ color: '#4caf84' }}>{fmt(totalAnnualPremium)}</div>
-            <div className="clients-stat-label">Total Annual Premium</div>
+            <div className="clients-stat-num" style={{ color: '#4caf84' }}>{fmt(totalAdvancedCommission)}</div>
+            <div className="clients-stat-label">Advanced Commission</div>
           </div>
           <div className="clients-stat">
             <div className="clients-stat-num" style={{ color: '#22d3ee' }}>{fmt(totalCommission)}</div>

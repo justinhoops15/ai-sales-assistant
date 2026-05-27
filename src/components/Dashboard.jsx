@@ -203,19 +203,34 @@ function fmtDate(iso) {
 }
 
 // ── Chart engine ────────────────────────────────────────────────────────────
-const CW = 800, CH = 180
-const PAD = { top: 16, right: 16, bottom: 28, left: 52 }
+const CW = 800, CH = 260
+const PAD = { top: 20, right: 20, bottom: 44, left: 60 }
+
+/** Round up to a clean chart ceiling (e.g. 7200 → 8000, 12500 → 15000) */
+function niceMax(raw) {
+  if (!raw || raw <= 0) return 2000
+  const mag  = Math.pow(10, Math.floor(Math.log10(raw)))
+  const ratio = raw / mag
+  const nice  = ratio <= 1 ? 1 : ratio <= 2 ? 2 : ratio <= 5 ? 5 : 10
+  return Math.max(nice * mag, 1000)
+}
+
+/** Short date label for X axis ticks */
+function fmtShortDate(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 function computePoints(data) {
   if (!data.length) return []
+  const n      = data.length
   const apVals = data.map(a => (parseFloat(a.monthlyPremium) || 0) * 12)
-  const dates  = data.map(a => new Date(a.savedAt).getTime())
-  const minD   = Math.min(...dates), maxD = Math.max(...dates)
-  const maxAP  = Math.max(...apVals) * 1.25 || 1000
-  const xR = CW - PAD.left - PAD.right
-  const yR = CH - PAD.top  - PAD.bottom
+  const maxAP  = niceMax(Math.max(...apVals) * 1.15)
+  const xR     = CW - PAD.left - PAD.right
+  const yR     = CH - PAD.top  - PAD.bottom
   return data.map((a, i) => ({
-    x:    PAD.left + ((dates[i] - minD) / (maxD - minD || 1)) * xR,
+    // Even spacing across the X axis regardless of time gaps between policies
+    x:    PAD.left + (n === 1 ? xR / 2 : (i / (n - 1)) * xR),
     y:    CH - PAD.bottom - (apVals[i] / maxAP) * yR,
     ap:   apVals[i],
     maxAP,
@@ -247,7 +262,7 @@ function buildPaths(pts) {
 }
 
 function YLabels({ maxAP }) {
-  return [0.25, 0.5, 0.75, 1].map(f => {
+  return [0.2, 0.4, 0.6, 0.8, 1.0].map(f => {
     const val = maxAP * f
     const y   = CH - PAD.bottom - f * (CH - PAD.top - PAD.bottom)
     const lbl = val >= 10000 ? `$${(val / 1000).toFixed(0)}k`
@@ -256,9 +271,9 @@ function YLabels({ maxAP }) {
     return (
       <g key={f}>
         <line x1={PAD.left} y1={y} x2={CW - PAD.right} y2={y}
-          stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-        <text x={PAD.left - 6} y={y + 4} textAnchor="end"
-          fontSize="10" fill="#444" fontFamily="inherit">{lbl}</text>
+          stroke="rgba(255,255,255,0.035)" strokeWidth="1" />
+        <text x={PAD.left - 8} y={y + 4} textAnchor="end"
+          fontSize="11" fill="#3a3a3a" fontFamily="inherit">{lbl}</text>
       </g>
     )
   })
@@ -719,8 +734,21 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
         </p>
       </div>
 
-      {/* ── Button row: same 4-column grid as stat row, button in col 4 only ── */}
+      {/* ── Button row: same 4-column grid as stat row, HCMS in col 3, New Appt in col 4 ── */}
       <div className="db-stat-btn-row">
+        <a className="db-cta-hcms"
+          href="https://ww3.familyfirstlife.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          HCMS Login
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"
+            stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4.5 1.5H2a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V6"/>
+            <polyline points="7 1.5 9.5 1.5 9.5 4"/>
+            <line x1="5.5" y1="5.5" x2="9.5" y2="1.5"/>
+          </svg>
+        </a>
         <button className="db-cta db-cta-stat" onClick={onNewAppointment}>
           + Start New Appointment
         </button>
@@ -797,7 +825,7 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
               <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" className="db-chart-svg">
                 <defs>
                   <linearGradient id="dbAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%"   stopColor="#7c3aed" stopOpacity="0.28" />
+                    <stop offset="0%"   stopColor="#7c3aed" stopOpacity="0.22" />
                     <stop offset="100%" stopColor="#7c3aed" stopOpacity="0"    />
                   </linearGradient>
                   <linearGradient id="dbLineGrad" x1="0" y1="0" x2="1" y2="0">
@@ -806,11 +834,32 @@ export default function Dashboard({ agentInfo, onNewAppointment, onChangeAgent, 
                   </linearGradient>
                 </defs>
                 <YLabels maxAP={maxAP} />
+                {/* Baseline */}
                 <line x1={PAD.left} y1={CH - PAD.bottom} x2={CW - PAD.right} y2={CH - PAD.bottom}
-                  stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                  stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
+                {/* Area + line */}
                 <path d={paths.area} fill="url(#dbAreaGrad)" />
-                <path d={paths.line} stroke="url(#dbLineGrad)" strokeWidth="2"
+                <path d={paths.line} stroke="url(#dbLineGrad)" strokeWidth="2.5"
                   fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                {/* Data point dots */}
+                {pts.map((pt, i) => (
+                  <circle key={i} cx={pt.x} cy={pt.y} r="4.5"
+                    fill="#7c3aed" stroke="#22d3ee" strokeWidth="1.5" opacity="0.9" />
+                ))}
+                {/* X-axis date labels — show ≤7, always show first and last */}
+                {(() => {
+                  const step = Math.max(1, Math.ceil(pts.length / 7))
+                  return pts.map((pt, i) => {
+                    const show = i === 0 || i === pts.length - 1 || i % step === 0
+                    if (!show) return null
+                    return (
+                      <text key={i} x={pt.x} y={CH - 10} textAnchor="middle"
+                        fontSize="10" fill="#3a3a3a" fontFamily="inherit">
+                        {fmtShortDate(pt.appt.savedAt)}
+                      </text>
+                    )
+                  })
+                })()}
               </svg>
 
               <div className="db-dot-layer">

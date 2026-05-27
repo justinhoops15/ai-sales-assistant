@@ -1,5 +1,19 @@
 import { useState } from 'react'
 
+// Agent portal URLs keyed by carrierId
+const CARRIER_AGENT_PORTALS = {
+  TRANS: 'https://secure.transamerica.com/login/sign-in/login.html',
+  AMER:  'https://portal.americoagent.com/',
+  AMAM:  'https://www.americanamicable.com/v4/AgentLogin.php',
+  MOO:   'https://producer.mutualofomaha.com',
+  FORE:  'https://www.foresters.com/en/for-agents',
+  AETNA: 'https://www.aetna.com/producer_public/login.fcc',
+  ETHOS: 'https://agents.ethoslife.com/login',
+  JH:    'https://agent.johnhancockinsurance.com/login',
+  CORE:  'https://www.corebridgefinancial.com',
+  PROS:  'https://www.prosperitylife.com/login',
+}
+
 const LEAD_LABELS = {
   mortgage_protection: 'Mortgage Protection',
   final_expense:       'Final Expense',
@@ -252,16 +266,34 @@ export default function Step7Results({
                     {rec.product.name} &middot; AM Best {rec.amBest}
                   </div>
                 </div>
-                <div className="result-badges">
-                  {rec.productLabel && rec.productLabel !== 'Final Expense' && (
-                    <span className="badge badge-am">{rec.productLabel}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                  <div className="result-badges">
+                    {rec.productLabel && rec.productLabel !== 'Final Expense' && (
+                      <span className="badge badge-am">{rec.productLabel}</span>
+                    )}
+                    <span className={`badge ${TIER_BADGE_CLASS[rec.tier] || 'badge-standard'}`}>
+                      {rec.tier}
+                    </span>
+                    <span className={`badge ${CONF_BADGE_CLASS[rec.confidence] || 'badge-medium'}`}>
+                      {rec.confidence} Confidence
+                    </span>
+                  </div>
+                  {CARRIER_AGENT_PORTALS[rec.carrierId] && (
+                    <a
+                      href={CARRIER_AGENT_PORTALS[rec.carrierId]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="carrier-agent-login"
+                    >
+                      Agent Login
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
+                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 1.5H2a1 1 0 00-1 1v5a1 1 0 001 1h5a1 1 0 001-1v-2"/>
+                        <polyline points="6.5 1.5 8.5 1.5 8.5 3.5"/>
+                        <line x1="5" y1="5" x2="8.5" y2="1.5"/>
+                      </svg>
+                    </a>
                   )}
-                  <span className={`badge ${TIER_BADGE_CLASS[rec.tier] || 'badge-standard'}`}>
-                    {rec.tier}
-                  </span>
-                  <span className={`badge ${CONF_BADGE_CLASS[rec.confidence] || 'badge-medium'}`}>
-                    {rec.confidence} Confidence
-                  </span>
                 </div>
               </div>
 
