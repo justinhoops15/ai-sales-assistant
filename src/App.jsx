@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import AgentSetup          from './components/AgentSetup.jsx'
 import Clients             from './components/Clients.jsx'
+import Leads               from './components/Leads.jsx'
 import Dashboard           from './components/Dashboard.jsx'
 import Earnings            from './components/Earnings.jsx'
 import Settings           from './components/Settings.jsx'
@@ -130,6 +131,7 @@ export default function App() {
   const [agentInfo,          setAgentInfo]          = useState(loadAgent)
   const [showDashboard,      setShowDashboard]      = useState(true)
   const [showClients,        setShowClients]        = useState(false)
+  const [showLeads,          setShowLeads]          = useState(false)
   const [showFollowUps,      setShowFollowUps]      = useState(false)
   const [showEarnings,       setShowEarnings]       = useState(false)
   const [showSettings,       setShowSettings]       = useState(false)
@@ -264,6 +266,7 @@ export default function App() {
     setAppointmentModal(false)
     setShowDashboard(false)
     setShowClients(false)
+    setShowLeads(false)
     setShowFollowUps(false)
     setShowEarnings(false)
     setShowSettings(false)
@@ -575,8 +578,8 @@ export default function App() {
     allGraded2,
   } : null
 
-  const sidebarActiveView  = showFollowUps ? 'followups' : showEarnings ? 'earnings' : showSettings ? 'settings' : showClients ? 'clients' : showDashboard ? 'dashboard' : 'appointment'
-  const sidebarCurrentStep = (!showDashboard && !showClients && !showFollowUps && !showEarnings && !showSettings && appScreen === null && step >= 1) ? step : null
+  const sidebarActiveView  = showFollowUps ? 'followups' : showEarnings ? 'earnings' : showSettings ? 'settings' : showLeads ? 'leads' : showClients ? 'clients' : showDashboard ? 'dashboard' : 'appointment'
+  const sidebarCurrentStep = (!showDashboard && !showClients && !showLeads && !showFollowUps && !showEarnings && !showSettings && appScreen === null && step >= 1) ? step : null
 
   function handleGoToClients() {
     setShowClients(true)
@@ -633,15 +636,16 @@ export default function App() {
 
   // True when user is in a new appointment flow (not editing from clients/followups)
   function isInNewApptFlow() {
-    return !showDashboard && !showClients && !showFollowUps && !showEarnings && !showSettings && !appointmentModal
+    return !showDashboard && !showClients && !showLeads && !showFollowUps && !showEarnings && !showSettings && !appointmentModal
   }
 
   function doNavigate(view) {
-    if (view === 'dashboard')   { setShowDashboard(true);  setShowClients(false); setShowFollowUps(false); setShowEarnings(false); setShowSettings(false); setAppScreen(null) }
-    if (view === 'clients')     { setShowClients(true);    setShowDashboard(false); setShowFollowUps(false); setShowEarnings(false); setShowSettings(false); setHighlightClientId(null); setAppScreen(null) }
-    if (view === 'followups')   { setShowFollowUps(true);  setShowDashboard(false); setShowClients(false);  setShowEarnings(false); setShowSettings(false); setAppScreen(null) }
-    if (view === 'earnings')    { setShowEarnings(true);   setShowDashboard(false); setShowClients(false);  setShowFollowUps(false); setShowSettings(false); setAppScreen(null) }
-    if (view === 'settings')    { setShowSettings(true);   setShowDashboard(false); setShowClients(false);  setShowFollowUps(false); setShowEarnings(false); setAppScreen(null) }
+    if (view === 'dashboard')   { setShowDashboard(true);  setShowClients(false); setShowLeads(false); setShowFollowUps(false); setShowEarnings(false); setShowSettings(false); setAppScreen(null) }
+    if (view === 'clients')     { setShowClients(true);    setShowDashboard(false); setShowLeads(false); setShowFollowUps(false); setShowEarnings(false); setShowSettings(false); setHighlightClientId(null); setAppScreen(null) }
+    if (view === 'leads')       { setShowLeads(true);      setShowDashboard(false); setShowClients(false); setShowFollowUps(false); setShowEarnings(false); setShowSettings(false); setAppScreen(null) }
+    if (view === 'followups')   { setShowFollowUps(true);  setShowDashboard(false); setShowClients(false);  setShowLeads(false); setShowEarnings(false); setShowSettings(false); setAppScreen(null) }
+    if (view === 'earnings')    { setShowEarnings(true);   setShowDashboard(false); setShowClients(false);  setShowLeads(false); setShowFollowUps(false); setShowSettings(false); setAppScreen(null) }
+    if (view === 'settings')    { setShowSettings(true);   setShowDashboard(false); setShowClients(false);  setShowLeads(false); setShowFollowUps(false); setShowEarnings(false); setAppScreen(null) }
     if (view === 'appointment') { handleNewAppointment() }
   }
 
@@ -841,6 +845,28 @@ export default function App() {
             onBack={() => setShowFollowUp(false)}
           />
         )}
+      </div>
+    )
+  }
+
+  // ── Leads ─────────────────────────────────────────────────────────────────
+  if (showLeads) {
+    return (
+      <div className="app">
+        <Sidebar
+          agentInfo={agentInfo}
+          activeView={sidebarActiveView}
+          currentStep={sidebarCurrentStep}
+          onNavigate={handleSidebarNavigate}
+          onChangeAgent={handleChangeAgent}
+          followUpCount={followUpCount}
+        />
+        <div className="app-body">
+          <FloatingAgentBadge agentInfo={agentInfo} />
+          <main className="app-main">
+            <Leads />
+          </main>
+        </div>
       </div>
     )
   }

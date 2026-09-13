@@ -34,6 +34,14 @@ function IconUsers() {
   )
 }
 
+function IconLeads() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5.2 1.5H3a1.5 1.5 0 00-1.5 1.5C1.5 9.96 6.04 14.5 12.5 14.5A1.5 1.5 0 0014 13v-2.2a.75.75 0 00-.53-.72l-2.5-.83a.75.75 0 00-.84.27l-.9 1.24a8.27 8.27 0 01-3.99-3.99l1.24-.9a.75.75 0 00.27-.84l-.83-2.5A.75.75 0 005.2 1.5z"/>
+    </svg>
+  )
+}
+
 function IconFollowUp() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -105,6 +113,14 @@ export default function Sidebar({ agentInfo, activeView, currentStep, onNavigate
         >
           <span className="sidebar-item-icon"><IconUsers /></span>
           Clients
+        </button>
+
+        <button
+          onClick={() => onNavigate('leads')}
+          className={`sidebar-item${activeView === 'leads' ? ' active' : ''}`}
+        >
+          <span className="sidebar-item-icon"><IconLeads /></span>
+          Leads
         </button>
 
         <button
