@@ -3,6 +3,7 @@ import {
   LOGO_AMER, LOGO_TRANS, LOGO_AMAM, LOGO_MOO, LOGO_FORE,
   LOGO_AETNA, LOGO_ETHOS, LOGO_JH, LOGO_CORE, LOGO_PROS,
 } from '../data/carrierLogos'
+import { CONNECTOR_LOGOS } from '../data/connectorLogos'
 
 // ── localStorage helpers ──────────────────────────────────────────────────────
 function load(key, fallback) {
@@ -851,6 +852,285 @@ function TabCalendar({ onToast }) {
   )
 }
 
+// ── Tab 6: Connectors ────────────────────────────────────────────────────────
+const CONNECTOR_DEFS = [
+  {
+    key: 'gmail',
+    name: 'Gmail',
+    desc: 'Track policy status and carrier emails automatically.',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#888888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1.5" y="3.5" width="15" height="11" rx="1.5"/>
+        <polyline points="1.5 5 9 10 16.5 5"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'outlook',
+    name: 'Outlook',
+    desc: 'Track policy status and carrier emails automatically.',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#888888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1.5" y="3.5" width="15" height="11" rx="1.5"/>
+        <path d="M9 3.5v11"/>
+        <polyline points="1.5 5 9 10 16.5 5"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'bank',
+    name: 'Bank',
+    desc: 'Match deposits to expected commission, flag underpayments.',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#888888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="9 1.5 16.5 6 1.5 6"/>
+        <line x1="3.5" y1="6" x2="3.5" y2="13"/>
+        <line x1="7" y1="6" x2="7" y2="13"/>
+        <line x1="11" y1="6" x2="11" y2="13"/>
+        <line x1="14.5" y1="6" x2="14.5" y2="13"/>
+        <line x1="1.5" y1="13" x2="16.5" y2="13"/>
+        <line x1="1.5" y1="15.5" x2="16.5" y2="15.5"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'googleCalendar',
+    name: 'Google Calendar',
+    desc: 'Sync appointments both ways.',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#888888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1.5" y="3" width="15" height="13.5" rx="1.5"/>
+        <line x1="5" y1="1.5" x2="5" y2="5"/>
+        <line x1="13" y1="1.5" x2="13" y2="5"/>
+        <line x1="1.5" y1="7.5" x2="16.5" y2="7.5"/>
+        <rect x="5" y="10" width="3" height="3" rx="0.5"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'outlookCalendar',
+    name: 'Outlook Calendar',
+    desc: 'Sync appointments both ways.',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#888888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1.5" y="3" width="15" height="13.5" rx="1.5"/>
+        <line x1="5" y1="1.5" x2="5" y2="5"/>
+        <line x1="13" y1="1.5" x2="13" y2="5"/>
+        <line x1="1.5" y1="7.5" x2="16.5" y2="7.5"/>
+        <path d="M5.5 11h7"/>
+        <path d="M5.5 13.5h4"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'appleCalendar',
+    name: 'Apple Calendar',
+    desc: 'Subscribe to your RevTron appointments.',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#888888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1.5" y="3" width="15" height="13.5" rx="1.5"/>
+        <line x1="5" y1="1.5" x2="5" y2="5"/>
+        <line x1="13" y1="1.5" x2="13" y2="5"/>
+        <line x1="1.5" y1="7.5" x2="16.5" y2="7.5"/>
+        <circle cx="9" cy="12" r="2"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'calendly',
+    name: 'Calendly',
+    desc: 'Let clients book open slots on your calendar.',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#888888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="9" r="7.5"/>
+        <polyline points="9 5 9 9 12.5 11"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'zoom',
+    name: 'Zoom',
+    desc: 'Auto-create meeting links for booked appointments.',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#888888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="4.5" width="11" height="9" rx="1.5"/>
+        <polyline points="12 7.5 17 4.5 17 13.5 12 10.5"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'discord',
+    name: 'Discord',
+    desc: 'Auto-post sales and leaderboards to your server.',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#888888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M13.5 3C13.5 3 11.8 2 9 2C6.2 2 4.5 3 4.5 3C4.5 3 2 6.5 2 10.5C2 10.5 3.5 12.5 6 13C6 13 6.5 12.5 7 12C5.5 11.5 5 10.5 5 10.5C5 10.5 5.5 10.8 6.5 11C8.5 11.5 11 11.3 12 10.8C12 10.8 11.5 11.5 10 12C10.5 12.5 11 13 11 13C13.5 12.5 15 10.5 15 10.5C15 6.5 12.5 3 12.5 3L13.5 3Z"/>
+        <circle cx="7" cy="9" r="1"/>
+        <circle cx="11" cy="9" r="1"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'slack',
+    name: 'Slack',
+    desc: 'Auto-post sales and leaderboards to your workspace.',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#888888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 1.5C6 2.3 5.3 3 4.5 3S3 2.3 3 1.5 3.7 0 4.5 0 6 0.7 6 1.5Z"/>
+        <line x1="4.5" y1="3" x2="4.5" y2="10.5"/>
+        <line x1="1.5" y1="6" x2="10.5" y2="6"/>
+        <path d="M12 6C12 5.2 12.7 4.5 13.5 4.5S15 5.2 15 6 14.3 7.5 13.5 7.5 12 6.8 12 6Z"/>
+        <line x1="13.5" y1="7.5" x2="13.5" y2="15"/>
+        <line x1="7.5" y1="12" x2="16.5" y2="12"/>
+        <path d="M0 13.5C0 12.7 0.7 12 1.5 12S3 12.7 3 13.5 2.3 15 1.5 15 0 14.3 0 13.5Z"/>
+        <path d="M12 16.5C12 15.7 12.7 15 13.5 15S15 15.7 15 16.5 14.3 18 13.5 18 12 17.3 12 16.5Z"/>
+        <line x1="3" y1="13.5" x2="12" y2="13.5"/>
+        <line x1="1.5" y1="12" x2="1.5" y2="4.5"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'phone',
+    name: 'Phone',
+    desc: 'Call leads in-app with a local number.',
+    soon: true,
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#888888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 2h4l1.5 4-2.5 1.5c1 2 2.5 3.5 4.5 4.5L12 9.5l4 1.5v4C16 16.5 14.5 18 13 18 6.5 17.5 0.5 11.5 0 5 0 3.5 1.5 2 3 2Z"/>
+      </svg>
+    ),
+  },
+]
+
+const CONN_DEFAULTS = CONNECTOR_DEFS.reduce((acc, c) => {
+  acc[c.key] = { connected: false }
+  return acc
+}, {})
+
+function ConnectorModal({ type, connector, onClose, onConfirmDisconnect }) {
+  if (type === 'connect') {
+    return (
+      <div className="settings-overlay" onClick={onClose}>
+        <div className="settings-modal" onClick={e => e.stopPropagation()}>
+          <div className="settings-modal-head">
+            <h3 className="settings-modal-title">Connect {connector.name}</h3>
+            <button className="settings-modal-close" onClick={onClose}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+              </svg>
+            </button>
+          </div>
+          <div className="settings-modal-form">
+            <div className="conn-modal-body">
+              <p className="conn-modal-desc">{connector.desc}</p>
+              <p className="conn-modal-soon">Not available yet — coming in a future update.</p>
+            </div>
+            <div className="settings-modal-actions">
+              <button type="button" className="stg-btn-secondary" onClick={onClose}>Cancel</button>
+              <button type="button" className="stg-btn-primary" disabled style={{ opacity: 0.4, cursor: 'default' }}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="settings-overlay" onClick={onClose}>
+      <div className="settings-modal" onClick={e => e.stopPropagation()}>
+        <div className="settings-modal-head">
+          <h3 className="settings-modal-title">Disconnect {connector.name}?</h3>
+          <button className="settings-modal-close" onClick={onClose}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+            </svg>
+          </button>
+        </div>
+        <div className="settings-modal-form">
+          <p className="conn-modal-desc">RevTron will stop receiving updates from this source.</p>
+          <div className="settings-modal-actions">
+            <button type="button" className="stg-btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="button" className="stg-btn-primary" onClick={onConfirmDisconnect}>Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TabConnectors({ onToast }) {
+  const [state, setState] = useState(() => load('ffl_connectors', CONN_DEFAULTS))
+  const [modal, setModal] = useState(null) // { type: 'connect'|'disconnect', key }
+
+  function openConnect(key) { setModal({ type: 'connect', key }) }
+  function openDisconnect(key) { setModal({ type: 'disconnect', key }) }
+  function closeModal() { setModal(null) }
+
+  function handleDisconnect() {
+    const key = modal.key
+    const next = { ...state, [key]: { connected: false } }
+    setState(next)
+    save('ffl_connectors', next)
+    setModal(null)
+    const name = CONNECTOR_DEFS.find(c => c.key === key)?.name || key
+    onToast(`${name} disconnected`)
+  }
+
+  const activeConnector = modal ? CONNECTOR_DEFS.find(c => c.key === modal.key) : null
+
+  return (
+    <div className="stg-tab-body">
+      <div className="conn-header">
+        <h2 className="conn-header-title">Connectors</h2>
+        <p className="conn-header-sub">Connect your accounts so RevTron can detect updates automatically.</p>
+      </div>
+
+      <div className="conn-grid">
+        {CONNECTOR_DEFS.map(c => {
+          const connected = !c.soon && state[c.key]?.connected
+          const pill = c.soon ? 'soon' : connected ? 'connected' : 'disconnected'
+          const pillLabel = c.soon ? 'Soon' : connected ? 'Connected' : 'Not Connected'
+
+          return (
+            <div key={c.key} className="conn-card">
+              <div className="conn-card-row1">
+                <div className="conn-card-left">
+                  <div className="conn-logo-slot">
+                    {CONNECTOR_LOGOS[c.key]
+                      ? <img src={CONNECTOR_LOGOS[c.key]} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      : c.icon}
+                  </div>
+                  <span className="conn-name">{c.name}</span>
+                </div>
+                {c.soon ? (
+                  <button className="conn-btn conn-btn-soon" disabled>Connect</button>
+                ) : connected ? (
+                  <button className="conn-btn conn-btn-disconnect" onClick={() => openDisconnect(c.key)}>Disconnect</button>
+                ) : (
+                  <button className="conn-btn conn-btn-connect" onClick={() => openConnect(c.key)}>Connect</button>
+                )}
+              </div>
+              <p className="conn-desc">{c.desc}</p>
+              <div className="conn-pill-row">
+                <span className={`conn-pill conn-pill-${pill}`}>{pillLabel}</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {modal && activeConnector && (
+        <ConnectorModal
+          type={modal.type}
+          connector={activeConnector}
+          onClose={closeModal}
+          onConfirmDisconnect={handleDisconnect}
+        />
+      )}
+    </div>
+  )
+}
+
 // ── Tab 5: Plan / Billing ─────────────────────────────────────────────────────
 function TabBilling({ isAgencyOwner, onToast }) {
   const [showManagePlan, setShowManagePlan] = useState(false)
@@ -1000,6 +1280,7 @@ export default function Settings({ agentInfo }) {
     { id: 'contracting', label: 'Contracting'                 },
     { id: 'calendar',    label: 'Calendar'                    },
     { id: 'billing',     label: 'Plan / Billing'              },
+    { id: 'connectors',  label: 'Connectors'                  },
   ]
   const visibleTabs = ALL_TABS.filter(t => !t.ownerOnly || isAgencyOwner)
 
@@ -1039,6 +1320,7 @@ export default function Settings({ agentInfo }) {
       {activeTab === 'contracting' && <TabContracting agentInfo={agentInfo}         onToast={showToast} />}
       {activeTab === 'calendar'    && <TabCalendar                                   onToast={showToast} />}
       {activeTab === 'billing'     && <TabBilling     isAgencyOwner={isAgencyOwner} onToast={showToast} />}
+      {activeTab === 'connectors'  && <TabConnectors                                 onToast={showToast} />}
 
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>
