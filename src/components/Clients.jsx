@@ -1,4 +1,22 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { CARRIER_LOGOS, CARRIER_LOGO_SCALE } from '../data/carrierLogos'
+
+// Fixed carrier order — id matches carrierId in appointment records and CARRIER_LOGOS keys
+const CARRIER_ORDER = [
+  { id: 'AMER',  name: 'Americo' },
+  { id: 'MOO',   name: 'Mutual of Omaha' },
+  { id: 'TRANS', name: 'Transamerica' },
+  { id: 'INSTA', name: 'InstaBrain' },
+  { id: 'ETHOS', name: 'Ethos' },
+  { id: 'CORE',  name: 'Corebridge Financial' },
+  { id: 'AMAM',  name: 'American Amicable' },
+  { id: 'AETNA', name: 'Aetna' },
+  { id: 'PROS',  name: 'Prosperity Life' },
+  { id: 'JH',    name: 'John Hancock' },
+  { id: 'FORE',  name: 'Foresters Financial' },
+  { id: 'RNA',   name: 'Royal Neighbors' },
+  { id: 'NLG',   name: 'National Life Group' },
+]
 
 const LEAD_LABELS = {
   mortgage_protection: 'Mortgage Protection',
@@ -348,12 +366,15 @@ function StatusConfirmModal({ statusId, onConfirm, onCancel }) {
 function PolicyStatusRow({ status, onSetStatus }) {
   const [pendingStatus, setPendingStatus] = useState(null)
 
-  const btns = [
+  const allBtns = [
     { id: 'approved',     label: 'Approved',     activeColor: '#4caf84', activeBg: 'rgba(76,175,132,0.15)',  activeBorder: 'rgba(76,175,132,0.45)' },
     { id: 'underwriting', label: 'Underwriting', activeColor: '#f59e0b', activeBg: 'rgba(245,158,11,0.12)',  activeBorder: 'rgba(245,158,11,0.45)' },
-    { id: 'denied',       label: 'Denied',       activeColor: '#3b82f6', activeBg: 'rgba(59,130,246,0.12)',  activeBorder: 'rgba(59,130,246,0.45)' },
     { id: 'paid',         label: 'Paid',         activeColor: '#4caf84', activeBg: 'rgba(76,175,132,0.2)',   activeBorder: 'rgba(76,175,132,0.6)'  },
   ]
+  // When paid, Underwriting is irrelevant — hide it
+  const btns = status === 'paid'
+    ? allBtns.filter(b => b.id === 'approved' || b.id === 'paid')
+    : allBtns
 
   function handleConfirm() {
     onSetStatus(pendingStatus)
@@ -414,11 +435,11 @@ function ClientCard({ record, chargeback, onDelete, onEdit, onChargeback, onView
     setEditingEnforced(false)
   }
 
-  // Card border class based on status
+  // Chargeback takes priority over policyStatus for the outline
   let statusClass = ''
-  if (policyStatus === 'underwriting') statusClass = ' client-card-underwriting'
-  else if (policyStatus === 'denied')  statusClass = ' client-card-denied'
-  else if (policyStatus === 'paid')    statusClass = ' client-card-paid'
+  if (isCharged)                                               statusClass = ' client-card-cb'
+  else if (policyStatus === 'approved' || policyStatus === 'paid') statusClass = ' client-card-paid'
+  else                                                         statusClass = ' client-card-underwriting'
 
   function handleStatusChange(newStatus) {
     // If denying and was not previously denied, show the denied modal
@@ -696,6 +717,186 @@ function ChargebackModal({ record, onConfirm, onCancel }) {
   )
 }
 
+/* ── Carrier Group (accordion row + expanded client list) ───────────────── */
+function CarrierGroup({
+  carrierId, carrierName, records, cbMap,
+  onEdit, onDelete, onChargeback, onViewDetails,
+  onUpdateStatus, onShowDeniedModal, onUpdateEnforced,
+  highlightClientId,
+}) {
+  const hasHighlight = records.some(r => r.id === highlightClientId)
+  const [expanded,        setExpanded]        = useState(hasHighlight)
+  const [timeFilter,      setTimeFilter]      = useState('all')
+  const [expandedClientId, setExpandedClientId] = useState(hasHighlight ? highlightClientId : null)
+
+  const isEmpty = records.length === 0
+
+  // Carrier-level stats (all records, no time filter)
+  const totalAP = records.reduce((s, r) => s + (parseFloat(r.monthlyPremium) || 0) * 12, 0)
+  const totalCBOwed = records.reduce((s, r) => s + (cbMap[r.id]?.chargebackAmount ?? 0), 0)
+  const inForceCount = records.filter(r => {
+    const st = r.policyStatus
+    return (!st || st === 'approved' || st === 'paid') && !cbMap[r.id]
+  }).length
+  const pendingCount = records.filter(r => r.policyStatus === 'underwriting').length
+
+  // Time-filtered + sorted for the expanded client list
+  const now = Date.now()
+  const TIME_MS = { week: 7*86400000, month: 30*86400000, year: 365*86400000 }
+  const filteredRecords = records
+    .filter(r => timeFilter === 'all' || (now - new Date(r.savedAt).getTime()) <= TIME_MS[timeFilter])
+    .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt))
+
+  function statusPill(record) {
+    if (cbMap[record.id]) return { label: 'Chargeback', cls: 'client-status-pill-chargeback' }
+    const s = record.policyStatus
+    if (!s || s === 'approved' || s === 'paid') return { label: 'In-Force', cls: 'client-status-pill-inforce' }
+    if (s === 'underwriting') return { label: 'Pending', cls: 'client-status-pill-pending' }
+    if (s === 'denied')       return { label: 'Denied',  cls: 'client-status-pill-denied' }
+    return { label: 'Unknown', cls: 'client-status-pill-pending' }
+  }
+
+  // Logo from shared carrierLogos.js, keyed by carrierId — same as Earnings.jsx
+  const logoSrc  = carrierId ? (CARRIER_LOGOS[carrierId] || null) : null
+  const initials = carrierName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+
+  function toggleClient(id) {
+    setExpandedClientId(prev => prev === id ? null : id)
+  }
+
+  return (
+    <div className={`carrier-group${isEmpty ? ' carrier-group-empty' : ''}`}>
+
+      {/* Carrier header row */}
+      <button
+        className="carrier-row"
+        onClick={() => { if (!isEmpty) setExpanded(e => !e) }}
+        disabled={isEmpty}
+        aria-expanded={expanded}
+      >
+        <div className="carrier-logo-slot">
+          {logoSrc
+            ? <img src={logoSrc} alt={carrierName} className="carrier-logo-img" style={{ transform: `scale(${CARRIER_LOGO_SCALE[carrierId] ?? 1})` }} />
+            : <span className="carrier-logo-initials">{initials}</span>
+          }
+        </div>
+
+        <div className="carrier-row-left">
+          <span className="carrier-row-name">{carrierName}</span>
+          <span className="carrier-row-count">
+            {isEmpty ? 'No policies' : (
+              <>
+                <span style={{ color: '#7c3aed', fontWeight: 700 }}>{records.length}</span>
+                {' '}{records.length === 1 ? 'policy' : 'policies'}
+              </>
+            )}
+          </span>
+        </div>
+
+        {!isEmpty && (
+          <div className="carrier-row-right">
+            <div className="carrier-row-stats">
+              <div className="carrier-stat-chip">
+                <span className="carrier-stat-label">AP</span>
+                <span className="carrier-stat-val" style={{ color: '#4caf84' }}>{fmt(totalAP)}</span>
+              </div>
+              <div className="carrier-stat-chip">
+                <span className="carrier-stat-label">Chargeback</span>
+                <span className="carrier-stat-val" style={{ color: totalCBOwed > 0 ? '#e05c5c' : '#333' }}>
+                  {totalCBOwed > 0 ? `−${fmt(totalCBOwed)}` : '—'}
+                </span>
+              </div>
+              <div className="carrier-stat-chip">
+                <span className="carrier-stat-label">In Force</span>
+                <span className="carrier-stat-val" style={{ color: '#22d3ee' }}>{inForceCount}</span>
+              </div>
+              <div className="carrier-stat-chip">
+                <span className="carrier-stat-label">Pending</span>
+                <span className="carrier-stat-val" style={{ color: pendingCount > 0 ? '#f59e0b' : '#333' }}>
+                  {pendingCount > 0 ? pendingCount : '—'}
+                </span>
+              </div>
+            </div>
+            <svg
+              className={`carrier-chevron${expanded ? ' carrier-chevron-open' : ''}`}
+              width="15" height="15" viewBox="0 0 15 15"
+              fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+            >
+              <polyline points="3.5 5.5 7.5 9.5 11.5 5.5"/>
+            </svg>
+          </div>
+        )}
+      </button>
+
+      {/* Expanded pane */}
+      {expanded && !isEmpty && (
+        <div className="carrier-clients-pane">
+
+          {/* Time filter */}
+          <div className="carrier-time-filter">
+            {[['week','Week'],['month','Month'],['year','Year'],['all','All Time']].map(([f, label]) => (
+              <button
+                key={f}
+                className={`carrier-time-btn${timeFilter === f ? ' carrier-time-btn-active' : ''}`}
+                onClick={() => setTimeFilter(f)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {filteredRecords.length === 0 ? (
+            <div className="carrier-empty-period">No policies closed in this period.</div>
+          ) : (
+            <div className="carrier-client-list">
+              {filteredRecords.map(record => (
+                <div key={record.id} id={`client-card-${record.id}`}>
+
+                  {/* Compact client row */}
+                  <div
+                    className={`client-list-row${expandedClientId === record.id ? ' client-list-row-active' : ''}`}
+                    onClick={() => toggleClient(record.id)}
+                  >
+                    {(() => { const p = statusPill(record); return <span className={`client-status-pill ${p.cls}`}>{p.label}</span> })()}
+                    <span className="client-list-name">{record.clientName || 'Unknown'}</span>
+                    <span className="client-list-ap">{fmt((parseFloat(record.monthlyPremium) || 0) * 12)}</span>
+                    <span className="client-list-mp">${(parseFloat(record.monthlyPremium) || 0).toFixed(2)}/mo</span>
+                    <span className="client-list-placeholder" />
+                    <svg
+                      className={`client-list-chevron${expandedClientId === record.id ? ' client-list-chevron-open' : ''}`}
+                      width="12" height="12" viewBox="0 0 12 12"
+                      fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+                    >
+                      <polyline points="3 4.5 6 7.5 9 4.5"/>
+                    </svg>
+                  </div>
+
+                  {/* Inline full ClientCard */}
+                  {expandedClientId === record.id && (
+                    <div className="client-list-expanded">
+                      <ClientCard
+                        record={record}
+                        chargeback={cbMap[record.id] || null}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onChargeback={onChargeback}
+                        onViewDetails={onViewDetails}
+                        onUpdateStatus={onUpdateStatus}
+                        onShowDeniedModal={onShowDeniedModal}
+                        onUpdateEnforced={onUpdateEnforced}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Main Clients Page ───────────────────────────────────────────────────── */
 export default function Clients({ onEdit, onNewAppointment, highlightClientId, onHighlightClear }) {
   const [appointments,   setAppointments]   = useState(loadAppointments)
@@ -951,24 +1152,6 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
             <button className="clients-search-clear" onClick={() => setSearch('')}>×</button>
           )}
         </div>
-        <select
-          className="clients-sort"
-          value={sortKey}
-          onChange={e => setSortKey(e.target.value)}
-        >
-          <option value="most_recent">Most Recent</option>
-          <option value="oldest_first">Oldest First</option>
-          <option value="highest_premium">Highest Annual Premium</option>
-          <option value="lowest_premium">Lowest Annual Premium</option>
-          <option value="most_months">Most Months in Force</option>
-          <option value="least_months">Least Months in Force</option>
-          <option value="chargebacks">Chargebacks</option>
-          <option disabled>──────────────</option>
-          <option value="status_approved">Status: Approved</option>
-          <option value="status_underwriting">Status: Underwriting</option>
-          <option value="status_denied">Status: Denied</option>
-          <option value="status_paid">Status: Paid</option>
-        </select>
       </div>
 
       {/* Empty state */}
@@ -996,22 +1179,49 @@ export default function Clients({ onEdit, onNewAppointment, highlightClientId, o
           <div className="clients-empty-sub">Try a different name, carrier, or product.</div>
         </div>
       ) : (
-        <div className="clients-grid">
-          {sorted.map(record => (
-            <div key={record.id} id={`client-card-${record.id}`}>
-              <ClientCard
-                record={record}
-                chargeback={cbMap[record.id] || null}
-                onEdit={onEdit}
-                onDelete={handleDelete}
-                onChargeback={handleChargeback}
-                onViewDetails={setViewTarget}
-                onUpdateStatus={updateStatus}
-                onShowDeniedModal={setDeniedTarget}
-                onUpdateEnforced={updateEnforced}
-              />
-            </div>
-          ))}
+        <div className="carrier-accordion">
+          {(() => {
+            // Group by carrierId where set, else fall back to carrier display name
+            const carrierMap = {}
+            sorted.forEach(r => {
+              const key = r.carrierId || r.carrier || 'Unknown'
+              if (!carrierMap[key]) carrierMap[key] = []
+              carrierMap[key].push(r)
+            })
+
+            // Build the known-key set from CARRIER_ORDER
+            const knownKeys = new Set(CARRIER_ORDER.map(c => c.id || c.name))
+
+            // Active carriers in fixed order
+            const activeInOrder = CARRIER_ORDER.filter(c => carrierMap[c.id || c.name]?.length > 0)
+            // Any carriers in data not in CARRIER_ORDER (legacy or unknown ids)
+            const extraActive = Object.keys(carrierMap)
+              .filter(k => !knownKeys.has(k))
+              .map(k => ({ id: k, name: carrierMap[k][0]?.carrier || k }))
+            // Empty carriers in fixed order
+            const emptyInOrder = CARRIER_ORDER.filter(c => !carrierMap[c.id || c.name]?.length)
+
+            return [...activeInOrder, ...extraActive, ...emptyInOrder].map(c => {
+              const key = c.id || c.name
+              return (
+                <CarrierGroup
+                  key={key}
+                  carrierId={c.id}
+                  carrierName={c.name}
+                  records={carrierMap[key] || []}
+                  cbMap={cbMap}
+                  onEdit={onEdit}
+                  onDelete={handleDelete}
+                  onChargeback={handleChargeback}
+                  onViewDetails={setViewTarget}
+                  onUpdateStatus={updateStatus}
+                  onShowDeniedModal={setDeniedTarget}
+                  onUpdateEnforced={updateEnforced}
+                  highlightClientId={highlightClientId}
+                />
+              )
+            })
+          })()}
         </div>
       )}
 

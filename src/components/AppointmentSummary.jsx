@@ -12,7 +12,7 @@ function fmt(n) {
   return '$' + Math.round(n).toLocaleString()
 }
 
-function saveAppointment({ application, clientName, formData, agentInfo, editingClientId, apptSessionId }) {
+function saveAppointment({ application, clientName, formData, agentInfo, editingClientId, apptSessionId, policyStatus }) {
   const { rec, face } = application
   const record = {
     id:               Date.now(),
@@ -26,7 +26,7 @@ function saveAppointment({ application, clientName, formData, agentInfo, editing
     clientSex:        formData.clientInfo?.sex            || '',
     clientState:      formData.clientInfo?.state          || '',
     clientPhone:      formData.clientInfo?.phoneNumber    || '',
-    clientEmail:      formData.clientInfo?.clientEmail   || '',
+    clientEmail:      formData.clientInfo?.clientEmail    || '',
     maritalStatus:    formData.clientInfo?.maritalStatus  || '',
     spouseName:       formData.clientInfo?.spouseName     || '',
     beneficiaries:    formData.clientInfo?.beneficiaries  || [],
@@ -47,6 +47,8 @@ function saveAppointment({ application, clientName, formData, agentInfo, editing
     insCoverage:      formData.financial?.insCoverage || '',
     insPremium:       formData.financial?.insPremium  || '',
     insYear:          formData.financial?.insYear     || '',
+    // Policy status: 'approved' | 'underwriting' | 'denied' | 'paid'
+    policyStatus:     policyStatus || 'approved',
   }
   try {
     let existing = JSON.parse(localStorage.getItem('ffl_appointments') || '[]')
@@ -88,6 +90,49 @@ function Row({ label, value, accent, large, warn, success }) {
   )
 }
 
+// Status selection configs
+const STATUS_OPTIONS = [
+  {
+    id:      'approved',
+    label:   'Approved as Applied',
+    sub:     'Policy approved on the spot. Counts toward IP and Commission immediately.',
+    color:   '#4caf84',
+    border:  'rgba(76,175,132,0.5)',
+    bg:      'rgba(76,175,132,0.08)',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#4caf84" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="10" cy="10" r="9"/><polyline points="6 10 8.5 12.5 14 7"/>
+      </svg>
+    ),
+  },
+  {
+    id:      'underwriting',
+    label:   'Sent to Underwriting',
+    sub:     'Submitted but pending carrier review. Counts toward AP only. Move to IP when approved.',
+    color:   '#f59e0b',
+    border:  'rgba(245,158,11,0.5)',
+    bg:      'rgba(245,158,11,0.07)',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#f59e0b" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="10" cy="10" r="9"/><polyline points="10 5 10 10 13 13"/>
+      </svg>
+    ),
+  },
+  {
+    id:      'denied',
+    label:   'Denied',
+    sub:     'Carrier denied this application. No record is saved. Return to carrier results to select a new option.',
+    color:   '#3b82f6',
+    border:  'rgba(59,130,246,0.5)',
+    bg:      'rgba(59,130,246,0.07)',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#3b82f6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="10" cy="10" r="9"/><line x1="7" y1="7" x2="13" y2="13"/><line x1="13" y1="7" x2="7" y2="13"/>
+      </svg>
+    ),
+  },
+]
+
 export default function AppointmentSummary({
   application,
   clientName,
@@ -98,30 +143,38 @@ export default function AppointmentSummary({
   onBack,
   onGoToClients,
   onSaveToFollowUp,
+  onDenied,
 }) {
   const { rec, face } = application
   const client = formData.clientInfo
 
-  const [showFollowUpModal, setShowFollowUpModal] = useState(false)
+  const [showFollowUpModal,  setShowFollowUpModal]  = useState(false)
+  const [statusSelection,    setStatusSelection]    = useState(null) // 'approved'|'underwriting'|'denied'
 
-  // Advance commission: monthly × commPct/100 × 9 (non-Ethos) or × 12 (Ethos)
-  // Must match exactly what Clients card and Earnings Commission Earned show.
+  // Advance commission preview (display only — matches existing card/earnings logic)
   const isEthos       = rec.carrierId === 'ETHOS'
   const advanceMonths = isEthos ? 12 : 9
   const advanceComm   = (application.monthlyPremium && rec.commissionPct != null)
     ? Math.round(parseFloat(application.monthlyPremium) * (rec.commissionPct / 100) * advanceMonths)
     : null
 
-  // Mark as Sold gate — both fields must be present before saving
+  // Save gate — denied only needs a status selection; others need premium + date
   const hasMonthlyPremium = parseFloat(application.monthlyPremium || 0) > 0
   const hasDateEnforced   = /^\d{2}\/\d{2}\/\d{4}$/.test(application.dateEnforced || '')
-  const canSell           = hasMonthlyPremium && hasDateEnforced
+  const canSell = statusSelection === 'denied'
+    ? true                                                   // denied — nothing saved, no data needed
+    : hasMonthlyPremium && hasDateEnforced && !!statusSelection
 
   function handleMarkSold() {
-    if (!canSell) return
-    saveAppointment({ application, clientName, formData, agentInfo, editingClientId, apptSessionId })
-    // Navigate immediately to Clients — agent should never sit on summary after completing
-    onGoToClients()
+    if (!canSell || !statusSelection) return
+    if (statusSelection === 'denied') {
+      // Denied — do NOT save to AP/IP; just return to carrier results
+      onDenied?.()
+    } else {
+      // Approved or Underwriting — save the record, then navigate to Clients
+      saveAppointment({ application, clientName, formData, agentInfo, editingClientId, apptSessionId, policyStatus: statusSelection })
+      onGoToClients()
+    }
   }
 
   return (
@@ -260,7 +313,39 @@ export default function AppointmentSummary({
         </div>
       </div>
 
-      {/* Actions — Mark as Sold navigates to Clients; Save to Follow Up navigates to Follow Up */}
+      {/* Status Selection — required before completing */}
+      <div className="apmt-status-section">
+        <div className="apmt-status-heading">
+          <span className="apmt-status-heading-text">Select Policy Status</span>
+          <span className="apmt-status-heading-sub">Choose the outcome before saving this appointment.</span>
+        </div>
+        <div className="apmt-status-grid">
+          {STATUS_OPTIONS.map(opt => {
+            const isActive = statusSelection === opt.id
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                className={`apmt-status-card${isActive ? ' apmt-status-card-active' : ''}`}
+                style={isActive ? {
+                  borderColor: opt.border,
+                  background:  opt.bg,
+                  boxShadow:   `0 0 0 1px ${opt.border}`,
+                } : {}}
+                onClick={() => setStatusSelection(prev => prev === opt.id ? null : opt.id)}
+              >
+                <div className="apmt-status-card-icon">{opt.icon}</div>
+                <div className="apmt-status-card-label" style={{ color: isActive ? opt.color : undefined }}>
+                  {opt.label}
+                </div>
+                <div className="apmt-status-card-sub">{opt.sub}</div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Actions */}
       <div className="step-actions">
         <button className="btn btn-secondary" onClick={onBack}>Back</button>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -270,16 +355,21 @@ export default function AppointmentSummary({
           </button>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
             <button
-              className="btn btn-success"
+              className={`btn ${statusSelection === 'denied' ? 'btn-denied-save' : 'btn-success'}`}
               onClick={handleMarkSold}
               disabled={!canSell}
               style={!canSell ? { opacity: 0.38, cursor: 'not-allowed', pointerEvents: 'none' } : {}}
             >
-              Mark as Sold
+              {statusSelection === 'denied'      ? 'Return to Carriers — Not Saved' :
+               statusSelection === 'underwriting' ? 'Save — Sent to Underwriting' :
+               statusSelection === 'approved'     ? 'Save — Approved' :
+               'Complete & Save'}
             </button>
             {!canSell && (
               <span style={{ fontSize: 11, color: '#555555', textAlign: 'right', lineHeight: 1.4 }}>
-                Monthly Premium and Date Enforced are required to save.
+                {!statusSelection
+                  ? 'Select a policy status above to continue.'
+                  : 'Monthly Premium and Date Enforced are required to save.'}
               </span>
             )}
           </div>

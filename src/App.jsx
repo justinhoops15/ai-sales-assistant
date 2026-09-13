@@ -724,6 +724,13 @@ export default function App() {
           onBack={() => { setAppScreen('application'); scrollTop() }}
           onGoToClients={handleGoToClients}
           onSaveToFollowUp={handleSaveApptToFollowUp}
+          onDenied={() => {
+            // Denied — remove this carrier from results and return to Step 7
+            setDeclinedKeys(prev => new Set([...prev, selectedApp.rec.resultKey]))
+            setAppScreen(null)
+            setSelectedApp(null)
+            scrollTop()
+          }}
         />
       )
     }

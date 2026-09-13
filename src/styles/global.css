@@ -2828,6 +2828,293 @@ textarea.field-input {
   .clients-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ── Carrier Accordion ──────────────────────────────────────────────────── */
+.carrier-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.carrier-group {
+  background: #050505;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 180ms ease;
+}
+
+.carrier-group:hover {
+  border-color: #3a3a3a;
+}
+
+.carrier-group-empty {
+  opacity: 0.28;
+}
+
+.carrier-group-empty .carrier-row {
+  cursor: default;
+}
+
+.carrier-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 20px;
+  padding: 20px 24px;
+  min-height: 100px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  color: #ffffff;
+  transition: background 150ms ease;
+}
+
+.carrier-row:hover:not(:disabled) {
+  background: rgba(255,255,255,0.02);
+}
+
+/* ── Logo slot ─────────────────────────────────────────────────────────── */
+.carrier-logo-slot {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carrier-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.carrier-logo-initials {
+  font-size: 13px;
+  font-weight: 700;
+  color: #333333;
+  letter-spacing: -0.02em;
+  user-select: none;
+}
+
+.carrier-row-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+}
+
+.carrier-row-name {
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.04em;
+}
+
+.carrier-row-count {
+  font-size: 13px;
+  color: #444444;
+  letter-spacing: 0.01em;
+}
+
+.carrier-row-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.carrier-row-stats {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+}
+
+.carrier-stat-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.carrier-stat-label {
+  font-size: 9px;
+  color: #444444;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 500;
+}
+
+.carrier-stat-val {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.carrier-chevron {
+  color: #555555;
+  flex-shrink: 0;
+  transition: transform 200ms ease;
+}
+
+.carrier-chevron-open {
+  transform: rotate(180deg);
+}
+
+/* ── Expanded carrier pane ──────────────────────────────────────────────── */
+.carrier-clients-pane {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 0 12px 10px;
+}
+
+.carrier-time-filter {
+  display: flex;
+  gap: 4px;
+  padding: 10px 4px 8px;
+}
+
+.carrier-time-btn {
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #555555;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 140ms ease;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.carrier-time-btn:hover {
+  color: #888888;
+}
+
+.carrier-time-btn-active {
+  background: rgba(34,211,238,0.08);
+  border-color: rgba(34,211,238,0.25);
+  color: #22d3ee;
+}
+
+.carrier-empty-period {
+  font-size: 12px;
+  color: #444444;
+  padding: 16px 4px;
+}
+
+/* ── Client list rows (compact) ─────────────────────────────────────────── */
+.carrier-client-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.client-list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+.client-list-row:last-of-type {
+  border-bottom: none;
+}
+
+.client-list-row:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.client-list-row-active {
+  background: rgba(255,255,255,0.03);
+}
+
+.client-status-pill {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.client-status-pill-inforce {
+  background: rgba(76,175,132,0.10);
+  color: #4caf84;
+  border: 1px solid rgba(76,175,132,0.22);
+}
+
+.client-status-pill-chargeback {
+  background: rgba(224,92,92,0.10);
+  color: #e05c5c;
+  border: 1px solid rgba(224,92,92,0.22);
+}
+
+.client-status-pill-pending {
+  background: rgba(245,158,11,0.09);
+  color: #f59e0b;
+  border: 1px solid rgba(245,158,11,0.22);
+}
+
+.client-status-pill-denied {
+  background: rgba(59,130,246,0.09);
+  color: #3b82f6;
+  border: 1px solid rgba(59,130,246,0.22);
+}
+
+.client-list-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #ffffff;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.client-list-ap {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4caf84;
+  min-width: 80px;
+  text-align: right;
+}
+
+.client-list-mp {
+  font-size: 13px;
+  color: #ffffff;
+  min-width: 70px;
+  text-align: right;
+}
+
+.client-list-placeholder {
+  min-width: 64px;
+}
+
+.client-list-chevron {
+  color: #444444;
+  flex-shrink: 0;
+  transition: transform 180ms ease;
+}
+
+.client-list-chevron-open {
+  transform: rotate(180deg);
+  color: #888888;
+}
+
+/* ── Inline expanded full card ──────────────────────────────────────────── */
+.client-list-expanded {
+  padding: 6px 0 10px;
+}
+
 /* ── Client Card ────────────────────────────────────────────────────────── */
 .client-card {
   background: #050505;
@@ -5918,16 +6205,13 @@ textarea.field-input {
 
 /* ── Client card status outlines ──────────────────────────────────── */
 .client-card-underwriting {
-  box-shadow: 0 0 0 3px rgba(245,158,11,0.6);
-  border-color: rgba(245,158,11,0.4) !important;
+  border-color: rgba(245,158,11,0.3) !important;
 }
 .client-card-denied {
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.6);
-  border-color: rgba(59,130,246,0.4) !important;
+  border-color: rgba(59,130,246,0.3) !important;
 }
 .client-card-paid {
-  box-shadow: 0 0 0 3px rgba(76,175,132,0.6);
-  border-color: rgba(76,175,132,0.4) !important;
+  border-color: rgba(76,175,132,0.3) !important;
 }
 
 /* ── Client status buttons ────────────────────────────────────────── */
