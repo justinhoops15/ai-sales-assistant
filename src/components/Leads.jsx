@@ -9,24 +9,28 @@ function save(key, val) {
 }
 
 // ── Single source of truth for all disposition labels + colors ────────────────
+// showOnRow: false = call-event data, hidden from lead row pills but usable everywhere else
 const DISPOSITIONS = [
-  { label: 'Not Called',       color: '#888888' },
-  { label: 'Voicemail',        color: '#a1734a' },
-  { label: 'Hung Up',          color: '#f97316' },
-  { label: 'Wrong Number',     color: '#e05c5c' },
-  { label: 'No English',       color: '#e05c5c' },
-  { label: 'Under 90 Seconds', color: '#3b82f6' },
-  { label: 'Over 90 Seconds',  color: '#3b82f6' },
-  { label: 'Showed Numbers',   color: '#ec4899' },
-  { label: 'Interested',       color: '#22d3ee' },
-  { label: 'Not Interested',   color: '#e05c5c' },
-  { label: 'Callback',         color: '#f59e0b' },
-  { label: 'Appointment Set',  color: '#4caf84' },
-  { label: 'Sold',             color: '#4caf84' },
+  { label: 'Voicemail',        color: '#a1734a', showOnRow: true  },
+  { label: 'Hung Up',          color: '#f97316', showOnRow: true  },
+  { label: 'Wrong Number',     color: '#e05c5c', showOnRow: true  },
+  { label: 'No English',       color: '#e05c5c', showOnRow: true  },
+  { label: 'Under 90 Seconds', color: '#3b82f6', showOnRow: false },
+  { label: 'Over 90 Seconds',  color: '#3b82f6', showOnRow: false },
+  { label: 'Showed Numbers',   color: '#ec4899', showOnRow: true  },
+  { label: 'Interested',       color: '#22d3ee', showOnRow: true  },
+  { label: 'Not Interested',   color: '#e05c5c', showOnRow: true  },
+  { label: 'Callback',         color: '#f59e0b', showOnRow: true  },
+  { label: 'Appointment Set',  color: '#4caf84', showOnRow: true  },
+  { label: 'Sold',             color: '#4caf84', showOnRow: true  },
 ]
 
-const DISP_MAP  = Object.fromEntries(DISPOSITIONS.map(d => [d.label, d.color]))
+const DISP_MAP    = Object.fromEntries(DISPOSITIONS.map(d => [d.label, d.color]))
 const DISP_LABELS = DISPOSITIONS.map(d => d.label)
+// Row-visible dispositions (excludes call-event duration data)
+const DISP_ROW_SET = new Set(DISPOSITIONS.filter(d => d.showOnRow).map(d => d.label))
+// Filter dropdown options — "Needs Disposition" is a computed state, not a real disposition
+const DISP_FILTER_OPTIONS = ['Needs Disposition', ...DISP_LABELS]
 
 function hexToRgba(hex, alpha) {
   const r = parseInt(hex.slice(1, 3), 16)
@@ -80,6 +84,29 @@ function migrateLead(lead) {
   return out
 }
 
+// ── Call log seed data (ffl_call_logs) ───────────────────────────────────────
+const SEED_CALL_LOGS = [
+  { id: 'cl001', leadId: 'l2',  agentId: null, dispositions: ['Voicemail'],                                      notes: null, durationSec: null, loggedAt: '2026-09-11T10:14:00Z' },
+  { id: 'cl002', leadId: 'l2',  agentId: null, dispositions: ['Voicemail'],                                      notes: null, durationSec: null, loggedAt: '2026-09-09T15:30:00Z' },
+  { id: 'cl003', leadId: 'l3',  agentId: null, dispositions: ['Over 90 Seconds', 'Showed Numbers', 'Interested'], notes: null, durationSec: null, loggedAt: '2026-09-09T14:22:00Z' },
+  { id: 'cl004', leadId: 'l4',  agentId: null, dispositions: ['Over 90 Seconds', 'Callback'],                    notes: null, durationSec: null, loggedAt: '2026-09-10T13:05:00Z' },
+  { id: 'cl005', leadId: 'l5',  agentId: null, dispositions: ['Under 90 Seconds', 'Not Interested'],             notes: null, durationSec: null, loggedAt: '2026-09-08T11:10:00Z' },
+  { id: 'cl006', leadId: 'l7',  agentId: null, dispositions: ['Over 90 Seconds', 'Interested'],                  notes: null, durationSec: null, loggedAt: '2026-09-05T15:20:00Z' },
+  { id: 'cl007', leadId: 'l9',  agentId: null, dispositions: ['Wrong Number'],                                   notes: null, durationSec: null, loggedAt: '2026-09-06T09:15:00Z' },
+  { id: 'cl008', leadId: 'l9',  agentId: null, dispositions: ['Hung Up'],                                        notes: null, durationSec: null, loggedAt: '2026-09-04T14:40:00Z' },
+  { id: 'cl009', leadId: 'l11', agentId: null, dispositions: ['Under 90 Seconds'],                               notes: null, durationSec: null, loggedAt: '2026-09-04T10:05:00Z' },
+  { id: 'cl010', leadId: 'l12', agentId: null, dispositions: ['Appointment Set', 'Sold'],                        notes: null, durationSec: null, loggedAt: '2026-09-03T09:10:00Z' },
+  { id: 'cl011', leadId: 'l12', agentId: null, dispositions: ['Over 90 Seconds', 'Showed Numbers'],              notes: null, durationSec: null, loggedAt: '2026-09-02T16:30:00Z' },
+  { id: 'cl012', leadId: 'l12', agentId: null, dispositions: ['Voicemail'],                                      notes: null, durationSec: null, loggedAt: '2026-09-02T11:00:00Z' },
+]
+
+function initCallLogs() {
+  const existing = load('ffl_call_logs', null)
+  if (existing) return existing
+  save('ffl_call_logs', SEED_CALL_LOGS)
+  return SEED_CALL_LOGS
+}
+
 function initLeads() {
   const existing = load('ffl_leads', null)
   if (existing) {
@@ -98,6 +125,11 @@ function getLocalTime(timezone) {
 function formatDate(iso) {
   if (!iso) return '—'
   try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
+  catch { return iso }
+}
+function formatDateTime(iso) {
+  if (!iso) return '—'
+  try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }
   catch { return iso }
 }
 
@@ -225,19 +257,37 @@ function SearchAutocomplete({ value, onChange, onSelectLead, leads }) {
 }
 
 // ── Disposition pills (row display) ──────────────────────────────────────────
-function DispositionPills({ dispositions }) {
-  if (!dispositions || dispositions.length === 0) {
+function DispositionPills({ dispositions, callCount, onNeedsDisposition }) {
+  // Zero calls always wins regardless of what's in dispositions array
+  if (callCount === 0) {
     return (
       <div className="lead-disp-pills-row">
-        <span className="lead-disp-pill" style={dispStyle('Not Called')}>NOT CALLED</span>
+        <span className="lead-disp-pill" style={{ color: '#888888', background: 'rgba(136,136,136,0.1)', borderColor: '#888888' }}>
+          NOT CALLED
+        </span>
       </div>
     )
   }
+
+  const rowDisps = (dispositions || []).filter(d => DISP_ROW_SET.has(d))
+
+  if (rowDisps.length > 0) {
+    return (
+      <div className="lead-disp-pills-row">
+        {rowDisps.map(d => (
+          <span key={d} className="lead-disp-pill" style={dispStyle(d)}>{d}</span>
+        ))}
+      </div>
+    )
+  }
+
+  // Has calls but no row-visible disposition — needs cleanup
   return (
     <div className="lead-disp-pills-row">
-      {dispositions.map(d => (
-        <span key={d} className="lead-disp-pill" style={dispStyle(d)}>{d}</span>
-      ))}
+      <button className="lead-disp-needs-btn"
+        onClick={e => { e.stopPropagation(); onNeedsDisposition() }}>
+        NEEDS DISPOSITION
+      </button>
     </div>
   )
 }
@@ -391,11 +441,78 @@ function CsvModal({ onClose }) {
   )
 }
 
+// ── Call History modal ────────────────────────────────────────────────────────
+function CallHistoryModal({ lead, callLogs, onDeleteLog, onClose }) {
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+
+  const leadLogs = [...callLogs]
+    .filter(log => log.leadId === lead.id)
+    .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
+
+  return (
+    <>
+      <div className="db-overlay" onClick={onClose}>
+        <div className="db-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+          <div className="db-modal-head">
+            <h2 className="db-modal-title">Call History — {lead.firstName} {lead.lastName}</h2>
+            <button className="db-modal-close" onClick={onClose}>×</button>
+          </div>
+          <div style={{ padding: '0 24px 24px' }}>
+            {leadLogs.length === 0 ? (
+              <p style={{ color: '#555555', fontSize: 14, margin: 0 }}>No calls logged yet.</p>
+            ) : (
+              <div className="ch-list">
+                {leadLogs.map(log => (
+                  <div key={log.id} className="ch-row">
+                    <div className="ch-row-top">
+                      <div className="ch-date">{formatDateTime(log.loggedAt)}</div>
+                      <button className="ch-undo-btn" onClick={() => setConfirmDeleteId(log.id)}>Undo</button>
+                    </div>
+                    <div className="ch-pills">
+                      {log.dispositions.length > 0
+                        ? log.dispositions.map(d => (
+                            <span key={d} className="lead-disp-pill" style={dispStyle(d)}>{d}</span>
+                          ))
+                        : <span style={{ color: '#555555', fontSize: 12 }}>No dispositions tagged</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ marginTop: 20, textAlign: 'right' }}>
+              <button className="leads-btn-cancel" onClick={onClose}>Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {confirmDeleteId && (
+        <div className="db-overlay" style={{ zIndex: 1001 }} onClick={() => setConfirmDeleteId(null)}>
+          <div className="db-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 380 }}>
+            <div className="db-modal-head">
+              <h2 className="db-modal-title">Delete this call log?</h2>
+              <button className="db-modal-close" onClick={() => setConfirmDeleteId(null)}>×</button>
+            </div>
+            <div style={{ padding: '0 24px 24px' }}>
+              <p style={{ color: '#888888', fontSize: 14, margin: '0 0 20px', lineHeight: 1.5 }}>
+                This removes the call from the lead's history and call analytics.
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button className="leads-btn-cancel" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                <button className="leads-btn-delete" onClick={() => { onDeleteLog(confirmDeleteId); setConfirmDeleteId(null) }}>Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ── Lead Row ──────────────────────────────────────────────────────────────────
-function LeadRow({ lead, onDisposition, onNotesChange, onCopyPhone }) {
+function LeadRow({ lead, callCount, onDisposition, onLogCall, onNotesChange, onCopyPhone, onCallHistory }) {
   const [open, setOpen] = useState(false)
   const [notes, setNotes] = useState(lead.notes || '')
-  const callCount = lead.callCount || 0
   const callLabel = callCount === 1 ? 'call' : 'calls'
 
   return (
@@ -417,17 +534,26 @@ function LeadRow({ lead, onDisposition, onNotesChange, onCopyPhone }) {
         <div className="lead-age">{lead.age || '—'}</div>
         <span className="lead-vendor-pill">{lead.vendor || '—'}</span>
         <div className="lead-disp-pills-col">
-          <DispositionPills dispositions={lead.dispositions} />
+          <DispositionPills
+            dispositions={lead.dispositions}
+            callCount={callCount}
+            onNeedsDisposition={() => onDisposition(lead)}
+          />
         </div>
         <div className="lead-call-activity-col">
-          <span className="lead-call-count">{callCount}</span>
-          <span className="lead-call-word"> {callLabel}</span>
+          <button className="lead-call-history-btn" onClick={e => { e.stopPropagation(); onCallHistory(lead) }}>
+            <span className="lead-call-count">{callCount}</span>
+            <span className="lead-call-word"> {callLabel}</span>
+          </button>
         </div>
         <div className="lead-received-col">{formatDate(lead.receivedAt)}</div>
         <div className="lead-actions" onClick={e => e.stopPropagation()}>
           <div className="lead-call-wrap" title="Connect a phone number in Settings → Connectors">
             <button className="lead-call-btn" disabled>Call</button>
           </div>
+          <button className="lead-log-call-btn" onClick={e => { e.stopPropagation(); onLogCall(lead) }}>
+            Log Call
+          </button>
           <button className="lead-disp-btn" onClick={e => { e.stopPropagation(); onDisposition(lead) }}>
             Disposition
           </button>
@@ -487,12 +613,21 @@ function LeadsTableHeader() {
 
 // ── Main Leads component ──────────────────────────────────────────────────────
 export default function Leads() {
-  const [leads, setLeads]       = useState(initLeads)
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const [showCreate, setShowCreate]   = useState(false)
-  const [showCsv, setShowCsv]         = useState(false)
-  const [dispModal, setDispModal]     = useState(null)
-  const [copied, setCopied]           = useState(false)
+  const [leads, setLeads]           = useState(initLeads)
+  const [callLogs, setCallLogs]     = useState(initCallLogs)
+  const [filtersOpen, setFiltersOpen]     = useState(false)
+  const [showCreate, setShowCreate]       = useState(false)
+  const [showCsv, setShowCsv]             = useState(false)
+  const [dispModal, setDispModal]               = useState(null)
+  const [pendingCallLogId, setPendingCallLogId] = useState(null)
+  const [callHistoryModal, setCallHistoryModal] = useState(null)
+  const [copied, setCopied]                     = useState(false)
+
+  // Derive call count per lead from logs
+  const callCountByLead = {}
+  callLogs.forEach(log => {
+    callCountByLead[log.leadId] = (callCountByLead[log.leadId] || 0) + 1
+  })
 
   // Live search (applied immediately, not gated by Apply button)
   const [filterSearch, setFilterSearch]     = useState('')
@@ -545,13 +680,23 @@ export default function Leads() {
       if (f.filterDateTo && lead.receivedAt > f.filterDateTo + 'T23:59:59Z') return false
       if (f.filterVendors.length && !f.filterVendors.includes(lead.vendor)) return false
       if (f.filterStates.length && !f.filterStates.includes(lead.state)) return false
-      if (f.filterDisps.length) {
-        const disps = (lead.dispositions || []).length === 0 ? ['Not Called'] : lead.dispositions
-        if (!f.filterDisps.some(fd => disps.includes(fd))) return false
-      }
-      if (f.filterExclDisps.length) {
-        const disps = (lead.dispositions || []).length === 0 ? ['Not Called'] : lead.dispositions
-        if (f.filterExclDisps.some(fd => disps.includes(fd))) return false
+      if (f.filterDisps.length || f.filterExclDisps.length) {
+        const lc = callCountByLead[lead.id] || 0
+        const rowDisps = (lead.dispositions || []).filter(d => DISP_ROW_SET.has(d))
+        const isNeedsDisp = lc > 0 && rowDisps.length === 0
+        const dispSet = new Set(lead.dispositions || [])
+        if (f.filterDisps.length) {
+          const matches = f.filterDisps.some(fd =>
+            fd === 'Needs Disposition' ? isNeedsDisp : dispSet.has(fd)
+          )
+          if (!matches) return false
+        }
+        if (f.filterExclDisps.length) {
+          const excluded = f.filterExclDisps.some(fd =>
+            fd === 'Needs Disposition' ? isNeedsDisp : dispSet.has(fd)
+          )
+          if (excluded) return false
+        }
       }
       if (f.filterNeverCalled && lead.called) return false
       return true
@@ -563,10 +708,68 @@ export default function Leads() {
     setTimeout(() => setCopied(false), 1500)
   }
 
-  function saveDisposition(disps) {
+  function saveDisposition(newDisps) {
+    // If opened from Log Call, write dispositions onto that log record
+    if (pendingCallLogId) {
+      const originalDisps = dispModal.dispositions || []
+      const addedDisps = newDisps.filter(d => !originalDisps.includes(d))
+      const updatedLogs = callLogs.map(log =>
+        log.id === pendingCallLogId ? { ...log, dispositions: addedDisps } : log
+      )
+      setCallLogs(updatedLogs)
+      save('ffl_call_logs', updatedLogs)
+      setPendingCallLogId(null)
+    }
     const updated = leads.map(l => l.id === dispModal.id
-      ? { ...l, dispositions: disps, called: disps.length > 0 } : l)
+      ? { ...l, dispositions: newDisps, called: newDisps.length > 0 }
+      : l)
     setLeads(updated); save('ffl_leads', updated); setDispModal(null)
+  }
+
+  function handleCloseDisposition() {
+    setPendingCallLogId(null)
+    setDispModal(null)
+  }
+
+  function handleLogCall(lead) {
+    const now = new Date().toISOString()
+    const newLog = {
+      id: `cl${Date.now()}`,
+      leadId: lead.id,
+      agentId: null,
+      dispositions: [],
+      notes: null,
+      durationSec: null,
+      loggedAt: now,
+    }
+    const updatedLogs = [newLog, ...callLogs]
+    setCallLogs(updatedLogs)
+    save('ffl_call_logs', updatedLogs)
+    const updatedLeads = leads.map(l =>
+      l.id === lead.id ? { ...l, lastContactedAt: now, called: true } : l
+    )
+    setLeads(updatedLeads)
+    save('ffl_leads', updatedLeads)
+    setPendingCallLogId(newLog.id)
+    setDispModal(lead)
+  }
+
+  function handleDeleteLog(logId) {
+    const logToDelete = callLogs.find(l => l.id === logId)
+    const updatedLogs = callLogs.filter(l => l.id !== logId)
+    setCallLogs(updatedLogs)
+    save('ffl_call_logs', updatedLogs)
+    if (logToDelete) {
+      const remaining = updatedLogs
+        .filter(l => l.leadId === logToDelete.leadId)
+        .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
+      const newLastContacted = remaining.length > 0 ? remaining[0].loggedAt : null
+      const updatedLeads = leads.map(l =>
+        l.id === logToDelete.leadId ? { ...l, lastContactedAt: newLastContacted } : l
+      )
+      setLeads(updatedLeads)
+      save('ffl_leads', updatedLeads)
+    }
   }
 
   function handleNotesChange(id, notes) {
@@ -610,8 +813,8 @@ export default function Leads() {
             </div>
             <MultiSelect label="Vendor" options={VENDORS} value={filterVendors} onChange={setFilterVendors} />
             <MultiSelect label="State" options={US_STATES} value={filterStates} onChange={setFilterStates} />
-            <MultiSelect label="Disposition" options={DISP_LABELS} value={filterDisps} onChange={setFilterDisps} />
-            <MultiSelect label="Exclude Disposition" options={DISP_LABELS} value={filterExclDisps} onChange={setFilterExclDisps} />
+            <MultiSelect label="Disposition" options={DISP_FILTER_OPTIONS} value={filterDisps} onChange={setFilterDisps} />
+            <MultiSelect label="Exclude Disposition" options={DISP_FILTER_OPTIONS} value={filterExclDisps} onChange={setFilterExclDisps} />
             <div className="leads-field" style={{ gridColumn: '1 / 3' }}>
               <label>Search</label>
               <SearchAutocomplete
@@ -643,9 +846,12 @@ export default function Leads() {
             <LeadsTableHeader />
             {filteredLeads.map(lead => (
               <LeadRow key={lead.id} lead={lead}
+                callCount={callCountByLead[lead.id] || 0}
                 onDisposition={l => setDispModal(l)}
+                onLogCall={handleLogCall}
                 onNotesChange={handleNotesChange}
-                onCopyPhone={handleCopyPhone} />
+                onCopyPhone={handleCopyPhone}
+                onCallHistory={l => setCallHistoryModal(l)} />
             ))}
           </>
         )}
@@ -653,7 +859,8 @@ export default function Leads() {
 
       {copied && <div className="leads-copy-toast">Phone copied!</div>}
 
-      {dispModal && <DispositionModal lead={dispModal} onSave={saveDisposition} onClose={() => setDispModal(null)} />}
+      {dispModal && <DispositionModal lead={dispModal} onSave={saveDisposition} onClose={handleCloseDisposition} />}
+      {callHistoryModal && <CallHistoryModal lead={callHistoryModal} callLogs={callLogs} onDeleteLog={handleDeleteLog} onClose={() => setCallHistoryModal(null)} />}
       {showCreate && <CreateLeadModal onSave={handleCreateLead} onClose={() => setShowCreate(false)} />}
       {showCsv && <CsvModal onClose={() => setShowCsv(false)} />}
     </div>
