@@ -7137,6 +7137,16 @@ textarea.field-input {
 .ca-vendor-table tbody tr:last-child td { border-bottom: none; }
 .ca-vendor-table tbody tr:hover td { background: #141414; }
 
+/* Funnel */
+.ca-funnel-row {
+  display: flex; align-items: center; gap: 12px; padding: 4px 0;
+}
+.ca-funnel-cta {
+  font-size: 11px; color: #a78bfa; opacity: 0; transition: opacity 150ms ease;
+  white-space: nowrap; width: 56px; flex-shrink: 0;
+}
+.ca-funnel-row:hover .ca-funnel-cta { opacity: 1; }
+
 /* Responsive */
 @media (max-width: 960px) {
   .ca-kpi-row { grid-template-columns: repeat(2,1fr); }

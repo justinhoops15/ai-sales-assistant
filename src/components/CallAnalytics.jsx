@@ -1,8 +1,8 @@
-import { useState, useMemo, useRef } from 'react'
+import React, { useState, useMemo, useRef } from 'react'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const DISPOSITIONS = [
-  { label: 'Voicemail',        color: '#a1734a' },
+  { label: 'No Answer',        color: '#64748b' },
   { label: 'Hung Up',          color: '#f97316' },
   { label: 'Wrong Number',     color: '#e05c5c' },
   { label: 'No English',       color: '#e05c5c' },
@@ -16,8 +16,10 @@ const DISPOSITIONS = [
   { label: 'Sold',             color: '#4caf84' },
 ]
 
+// Every disposition where a live person answered — No Answer is the only exclusion
 const CONTACT_SET = new Set([
-  'Over 90 Seconds','Under 90 Seconds','Showed Numbers',
+  'Hung Up','Wrong Number','No English',
+  'Under 90 Seconds','Over 90 Seconds','Showed Numbers',
   'Interested','Not Interested','Callback','Appointment Set','Sold',
 ])
 
@@ -29,6 +31,38 @@ const RANGES = [
   { id: 'all',   label: 'All Time' },
 ]
 
+// Single source of truth for all industry benchmarks
+const BENCHMARKS = {
+  answerRate:           { min: 8,    max: 12   },  // contacts per call (%)
+  contactRate:          { min: 30,   max: 45   },  // leads reached per lead received (%)
+  appointmentRate:      { min: 25,   max: 35   },  // appt per contacted lead (%)
+  closeRate:            { min: 20,   max: 30   },  // sold per appointment (%)
+  avgApPerSale:         900,                        // dollars
+  apPerWeek:            { min: 3000, max: 4000 },   // dollars
+  appointmentsPerWeek:  { min: 15,   max: 25   },
+}
+
+// ── State derivation (mirrors Leads.jsx logic) ─────────────────────────────────
+const CA_STATE_SET = new Set(['Callback','Interested','Not Interested','Appointment Set','Sold'])
+const CA_STATE_CLEARS = {
+  'Sold':            new Set(['Callback','Interested','Not Interested','Appointment Set']),
+  'Appointment Set': new Set(['Callback','Interested','Not Interested']),
+  'Not Interested':  new Set(['Callback','Interested']),
+  'Interested':      new Set(['Not Interested']),
+}
+function deriveCurrentState(leadLogs) {
+  const sorted = [...leadLogs].sort((a,b) => new Date(a.loggedAt)-new Date(b.loggedAt))
+  let state = null; let stateLogId = null
+  for (const log of sorted) {
+    for (const d of (log.dispositions || [])) {
+      if (!CA_STATE_SET.has(d)) continue
+      if (CA_STATE_CLEARS[d] && state && CA_STATE_CLEARS[d].has(state)) { state = null; stateLogId = null }
+      state = d; stateLogId = log.id
+    }
+  }
+  return { state, stateLogId }
+}
+
 // ── PRNG ───────────────────────────────────────────────────────────────────────
 function seededRng(seed) {
   let s = seed >>> 0
@@ -36,13 +70,15 @@ function seededRng(seed) {
 }
 
 // ── Seed demo data ─────────────────────────────────────────────────────────────
+const SEED_VERSION = 'v3'
 function seedDemoData() {
+  // Re-seed if version tag missing or leads count < 50
   try {
-    const el = localStorage.getItem('ffl_call_logs')
-    if (el && JSON.parse(el).length > 0) return
-    const ell = localStorage.getItem('ffl_leads')
-    if (ell && JSON.parse(ell).length > 0) return
-  } catch { return }
+    const el  = localStorage.getItem('ffl_leads')
+    const ecl = localStorage.getItem('ffl_call_logs')
+    const sv  = localStorage.getItem('ffl_seed_ver')
+    if (sv === SEED_VERSION && el && JSON.parse(el).length >= 50 && ecl) return
+  } catch {}
 
   const rng = seededRng(42)
   const now = new Date()
@@ -63,14 +99,15 @@ function seedDemoData() {
   function pickVendor() { const r = rng()*100; return VSEED.find(v => r <= v._w) || VSEED[0] }
   function pickHour() {
     const r = rng()
-    if (r < 0.22) return 10 + Math.floor(rng()*2)
-    if (r < 0.44) return 17 + Math.floor(rng()*2)
-    if (r < 0.74) return 9  + Math.floor(rng()*9)
-    return 8 + Math.floor(rng()*12)
+    if (r < 0.25) return 10 + Math.floor(rng()*2)   // 10-11am peak
+    if (r < 0.50) return 17 + Math.floor(rng()*2)   // 5-6pm peak
+    if (r < 0.80) return 9  + Math.floor(rng()*9)   // 9am-5pm broad
+    return 18 + Math.floor(rng()*2)                  // 6-7pm tail
   }
 
+  // Spread 120 leads across 90 days; weight newer leads slightly more
   const leads = Array.from({ length: 120 }, (_, i) => {
-    const daysAgo = Math.floor(rng()*89)
+    const daysAgo = Math.floor(Math.pow(rng(), 1.4) * 89) // bias toward recent
     const rec = new Date(now)
     rec.setDate(rec.getDate() - daysAgo)
     rec.setHours(Math.floor(rng()*24), Math.floor(rng()*60), 0, 0)
@@ -87,44 +124,51 @@ function seedDemoData() {
 
   const logs = []; let lid = 0
   leads.forEach(lead => {
-    if (rng() < 0.25) { delete lead._cr; return }
-    const daysAgo = (now - new Date(lead.receivedAt)) / 86400000
-    const trendBoost = Math.max(0, (90 - daysAgo) / 90) * 0.04
+    if (rng() < 0.25) { delete lead._cr; return } // ~25% never called
+    // attempts: average 2-4, some up to 8
     const ar = rng()
-    const attempts = ar < 0.08 ? 1+Math.floor(rng()*2)
-      : ar < 0.22 ? 3+Math.floor(rng()*2)
-      : ar < 0.46 ? 5+Math.floor(rng()*2)
-      : ar < 0.74 ? 7+Math.floor(rng()*2)
-      : 9+Math.floor(rng()*3)
+    const attempts = ar < 0.30 ? 1 + Math.floor(rng()*2)      // 1-2 (30%)
+      : ar < 0.65 ? 3 + Math.floor(rng()*2)                   // 3-4 (35%)
+      : ar < 0.88 ? 5 + Math.floor(rng()*2)                   // 5-6 (23%)
+      : 7 + Math.floor(rng()*2)                                // 7-8 (12%)
 
     let contacted = false
     let callDate = new Date(lead.receivedAt)
-    for (let a = 0; a < attempts; a++) {
-      if (a > 0) { callDate = new Date(callDate); callDate.setDate(callDate.getDate() + Math.floor(rng()*3)+1) }
-      const dow = callDate.getDay()
-      if ((dow===0||dow===6) && rng()>0.28) callDate.setDate(callDate.getDate()+(dow===0?1:2))
-      callDate.setHours(pickHour(), Math.floor(rng()*60), 0, 0)
-      if (callDate > now) { callDate = new Date(now); callDate.setMinutes(callDate.getMinutes()-30) }
+    // First call: speed-to-lead varies (minutes → days)
+    const stdMinutes = rng() < 0.20 ? Math.floor(rng()*60)         // within 1hr
+      : rng() < 0.55 ? Math.floor(rng()*480)+60                    // 1-8hr
+      : Math.floor(rng()*2880)+480                                  // 8hr-2days
+    callDate = new Date(callDate.getTime() + stdMinutes * 60000)
 
-      const cr = lead._cr + trendBoost
-      const isContact = !contacted && rng() < cr
+    for (let a = 0; a < attempts; a++) {
+      if (a > 0) { callDate = new Date(callDate.getTime() + (Math.floor(rng()*2)+1)*86400000) }
+      // Weekends ~30% of weekday volume
+      const dow = callDate.getDay()
+      if ((dow===0||dow===6) && rng()>0.30) callDate.setDate(callDate.getDate()+(dow===0?1:2))
+      callDate.setHours(pickHour(), Math.floor(rng()*60), 0, 0)
+      if (callDate > now) { callDate = new Date(now); callDate.setMinutes(callDate.getMinutes()-15) }
+
+      const daysAgo = (now - new Date(lead.receivedAt)) / 86400000
+      const trendBoost = Math.max(0, (90 - daysAgo) / 90) * 0.03
+      const isContact = !contacted && rng() < (lead._cr + trendBoost)
       let dispositions = []
       if (isContact) {
         contacted = true
         const r2 = rng()
-        if (r2 < 0.04)      dispositions = ['Sold']
-        else if (r2 < 0.16) dispositions = ['Appointment Set']
-        else if (r2 < 0.30) dispositions = ['Interested']
-        else if (r2 < 0.48) dispositions = ['Callback']
-        else if (r2 < 0.62) dispositions = ['Not Interested']
+        if (r2 < 0.037)     dispositions = ['Sold']
+        else if (r2 < 0.11) dispositions = ['Appointment Set']
+        else if (r2 < 0.26) dispositions = ['Interested']
+        else if (r2 < 0.44) dispositions = ['Callback']
+        else if (r2 < 0.60) dispositions = ['Not Interested']
         else if (r2 < 0.80) dispositions = ['Over 90 Seconds']
         else                dispositions = ['Showed Numbers']
       } else {
+        // No Answer ~62%, Hung Up ~5%, Wrong Number ~4%, No English ~2%, rest silent
         const r2 = rng()
-        if (r2 < 0.50)      dispositions = ['Voicemail']
-        else if (r2 < 0.72) dispositions = ['Hung Up']
-        else if (r2 < 0.86) dispositions = ['Under 90 Seconds']
-        else if (r2 < 0.94) dispositions = ['Wrong Number']
+        if (r2 < 0.855)     dispositions = ['No Answer']
+        else if (r2 < 0.924) dispositions = ['Hung Up']
+        else if (r2 < 0.979) dispositions = ['Wrong Number']
+        else if (r2 < 0.999) dispositions = ['No English']
         else                dispositions = []
       }
       logs.push({ id:`sl-${lid++}`, leadId:lead.id, agentId:null, dispositions, notes:null, durationSec:null, loggedAt:callDate.toISOString() })
@@ -134,9 +178,27 @@ function seedDemoData() {
     delete lead._cr
   })
 
+  // Guarantee meaningful activity in the last 7 days: pick 30 random logs and
+  // reschedule them to within the last 7 days so the weekly view is populated.
+  const recentPool = logs.filter(l => {
+    const d = new Date(l.loggedAt); return (now - d) > 7*86400000
+  })
+  const toReschedule = Math.min(30, recentPool.length)
+  for (let i = 0; i < toReschedule; i++) {
+    const idx = Math.floor(rng() * recentPool.length)
+    const log = recentPool.splice(idx, 1)[0]
+    const d = new Date(now)
+    d.setDate(d.getDate() - Math.floor(rng()*7))
+    d.setHours(pickHour(), Math.floor(rng()*60), 0, 0)
+    if (d > now) d.setHours(now.getHours()-1)
+    log.loggedAt = d.toISOString()
+  }
+
   try {
     localStorage.setItem('ffl_leads', JSON.stringify(leads))
     localStorage.setItem('ffl_call_logs', JSON.stringify(logs))
+    localStorage.setItem('ffl_seed_ver', SEED_VERSION)
+    console.log(`Seeded ${leads.length} leads, ${logs.length} call logs`)
   } catch(e) {}
 }
 
@@ -171,6 +233,26 @@ function filterLogs(logs, start, end) {
 }
 
 function pct(a, b) { return b ? Math.round((a/b)*100) : 0 }
+
+function comparisonLabel(range) {
+  switch(range) {
+    case 'today': return 'vs yesterday'
+    case 'week':  return 'vs last week'
+    case 'month': return 'vs last month'
+    case 'year':  return 'vs last year'
+    default:      return null
+  }
+}
+
+function benchmarkColor(rate, bench) {
+  if (rate >= bench.min) return '#4caf84'
+  if (rate >= bench.min * 0.75) return '#f59e0b'
+  return '#e05c5c'
+}
+
+function fmtDate(d) {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 function formatDuration(ms) {
   if (!ms || ms <= 0) return '—'
@@ -362,85 +444,129 @@ function DispositionBars({ logs }) {
 }
 
 // ── Conversion funnel ──────────────────────────────────────────────────────────
-function ConversionFunnel({ leads, logs, onNavigate }) {
+function ConversionFunnel({ leads, allLogs, onNavigate, start, end, range }) {
   const [hoveredIdx, setHoveredIdx] = useState(null)
-  const [tooltip, setTooltip] = useState(null)
+  const [titleHov,   setTitleHov]   = useState(false)
 
+  // Use all logs so a lead received in Week 1 that sells in Week 6 still counts
   const logsByLead = useMemo(() => {
     const m = {}
-    logs.forEach(l => { if(!m[l.leadId]) m[l.leadId]=[]; m[l.leadId].push(l) })
+    allLogs.forEach(l => { if(!m[l.leadId]) m[l.leadId]=[]; m[l.leadId].push(l) })
     return m
-  }, [logs])
+  }, [allLogs])
 
   const total     = leads.length
   const called    = leads.filter(l => (logsByLead[l.id]||[]).length > 0).length
   const contacted = leads.filter(l => (logsByLead[l.id]||[]).some(lg => lg.dispositions.some(d => CONTACT_SET.has(d)))).length
-  const interested= leads.filter(l => (logsByLead[l.id]||[]).some(lg => lg.dispositions.includes('Interested')||lg.dispositions.includes('Appointment Set')||lg.dispositions.includes('Sold'))).length
+  const interested= leads.filter(l => {
+    const ll = logsByLead[l.id] || []
+    const { state } = deriveCurrentState(ll)
+    if (state === 'Interested' || state === 'Callback' || state === 'Appointment Set' || state === 'Sold') return true
+    return ll.some(lg => lg.dispositions.includes('Showed Numbers'))
+  }).length
   const apptSet   = leads.filter(l => (logsByLead[l.id]||[]).some(lg => lg.dispositions.includes('Appointment Set')||lg.dispositions.includes('Sold'))).length
   const sold      = leads.filter(l => (logsByLead[l.id]||[]).some(lg => lg.dispositions.includes('Sold'))).length
 
+  // Per-stage benchmark info: { label, rate (0-100), bench }
+  const crRate   = pct(contacted, total)
+  const arRate   = pct(apptSet,  contacted)
+  const srRate   = pct(sold,     apptSet)
+
   const STAGES = [
-    { label:'Leads Received', value:total,     filter:null,         color:'#7c3aed' },
-    { label:'Called',         value:called,    filter:'called',     color:'#6244cc' },
-    { label:'Contacted',      value:contacted, filter:'contacted',  color:'#22d3ee' },
-    { label:'Interested',     value:interested,filter:'interested', color:'#1bb5cc' },
-    { label:'Appt Set',       value:apptSet,   filter:'appt_set',  color:'#4caf84' },
-    { label:'Sold',           value:sold,      filter:'sold',       color:'#3d9e73' },
+    { label:'Leads Received', value:total,      filter:null,         color:'#7c3aed', bmk:null },
+    { label:'Called',         value:called,     filter:'called',     color:'#6244cc', bmk:null },
+    { label:'Contacted',      value:contacted,  filter:'contacted',  color:'#22d3ee',
+      bmk:{ text:'avg 30–45%', rate:crRate, bench:BENCHMARKS.contactRate } },
+    { label:'Interested',     value:interested, filter:'interested', color:'#1bb5cc', bmk:null },
+    { label:'Appt Set',       value:apptSet,    filter:'appt_set',   color:'#4caf84',
+      bmk:{ text:'avg 25–35% of contacted', rate:arRate, bench:BENCHMARKS.appointmentRate } },
+    { label:'Sold',           value:sold,       filter:'sold',       color:'#3d9e73',
+      bmk:{ text:'avg 20–30% of appts', rate:srRate, bench:BENCHMARKS.closeRate } },
   ]
+
+  const now = new Date()
+  const showRecentNote = range === 'today' || range === 'week' ||
+    (end && (now - end) < 14*86400000 && start && (now - start) < 30*86400000)
+
+  const subtitleDate = start && end
+    ? `Leads received ${fmtDate(start)} – ${fmtDate(end)}, tracked through to sale`
+    : `${total.toLocaleString()} leads · click any stage to view in Leads`
 
   return (
     <div className="ca-card" style={{ marginBottom:12 }}>
-      <div className="ca-card-head">
-        <span className="ca-card-title">Conversion Funnel</span>
-        <span style={{ fontSize:11, color:'#555555' }}>{total.toLocaleString()} total leads</span>
+      <div className="ca-card-head" style={{ alignItems:'flex-start' }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <span
+              className="ca-card-title"
+              style={{ cursor:'help', borderBottom:'1px dotted #333333' }}
+              onMouseEnter={() => setTitleHov(true)}
+              onMouseLeave={() => setTitleHov(false)}
+            >Conversion Funnel</span>
+            {titleHov && (
+              <div style={{ position:'absolute', marginTop:28, background:'#1e1e1e', border:'1px solid #3a3a3a', borderRadius:8, padding:'8px 12px', fontSize:11, color:'#888888', maxWidth:300, lineHeight:1.5, zIndex:100, pointerEvents:'none' }}>
+                Counts leads by when you received them, not when they sold. A lead received this week that sells next month still counts here.
+              </div>
+            )}
+          </div>
+          <span style={{ fontSize:11, color:'#555555' }}>{subtitleDate}</span>
+        </div>
+        {showRecentNote && (
+          <span style={{ fontSize:10, color:'#444444', textAlign:'right', maxWidth:200, lineHeight:1.4 }}>
+            Recent leads still working —<br/>conversion will rise as they mature
+          </span>
+        )}
       </div>
       <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
         {STAGES.map((stage, i) => {
-          const barPct  = total > 0 ? Math.max(1, Math.round(stage.value/total*100)) : 1
-          const dropOff = i > 0 ? STAGES[i-1].value - stage.value : 0
-          const dropPct = i > 0 && STAGES[i-1].value > 0 ? Math.round(dropOff/STAGES[i-1].value*100) : 0
-          const isHov   = hoveredIdx === i
+          const prevVal = i > 0 ? STAGES[i-1].value : total
+          const stagePct = prevVal > 0 ? Math.round(stage.value/prevVal*100) : 0
+          const barPct   = total > 0 ? Math.max(1, Math.round(stage.value/total*100)) : 1
+          const dropOff  = i > 0 ? STAGES[i-1].value - stage.value : 0
+          const dropPct  = prevVal > 0 ? Math.round(dropOff/prevVal*100) : 0
+          const isHov    = hoveredIdx === i
+          const bmkColor = stage.bmk ? benchmarkColor(stage.bmk.rate, stage.bmk.bench) : null
 
           return (
             <div key={stage.label}>
               {i > 0 && dropOff > 0 && (
                 <div style={{ display:'flex', alignItems:'center', paddingLeft:136, paddingTop:3, paddingBottom:3 }}>
-                  <span style={{ fontSize:11, color:'#e05c5c', fontVariantNumeric:'tabular-nums' }}>
+                  <span style={{ fontSize:11, color:'#3a3a3a', fontVariantNumeric:'tabular-nums' }}>
                     ↓ {dropOff.toLocaleString()} dropped ({dropPct}%)
                   </span>
                 </div>
               )}
               <div
-                style={{ display:'flex', alignItems:'center', gap:12, padding:'4px 0',
-                  opacity: hoveredIdx!==null&&!isHov ? 0.45 : 1,
-                  cursor: stage.filter ? 'pointer' : 'default',
-                  transition:'opacity 150ms ease' }}
+                className="ca-funnel-row"
+                style={{ opacity: hoveredIdx!==null&&!isHov ? 0.45 : 1, transition:'opacity 150ms ease',
+                  cursor: stage.filter ? 'pointer' : 'default' }}
                 onClick={() => stage.filter && onNavigate?.('leads', { type:stage.filter, label:stage.label })}
-                onMouseEnter={e => { setHoveredIdx(i); setTooltip({ x:e.clientX, y:e.clientY, stage, barPct }) }}
-                onMouseLeave={() => { setHoveredIdx(null); setTooltip(null) }}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx(null)}
               >
-                <div style={{ width:120, flexShrink:0, textAlign:'right', fontSize:12, color: isHov?'#cccccc':'#888888', transition:'color 150ms' }}>
+                <div style={{ width:120, flexShrink:0, textAlign:'right', fontSize:12, color:isHov?'#cccccc':'#888888', transition:'color 150ms' }}>
                   {stage.label}
                 </div>
                 <div style={{ flex:1, height:26, background:'#1a1a1a', borderRadius:5, overflow:'hidden' }}>
                   <div style={{ height:'100%', width:`${barPct}%`, background:stage.color, borderRadius:5, transition:'width 0.5s ease' }}/>
                 </div>
-                <div style={{ width:90, flexShrink:0, fontSize:13, fontVariantNumeric:'tabular-nums' }}>
-                  <span style={{ color:'#ffffff', fontWeight:600 }}>{stage.value.toLocaleString()}</span>
-                  <span style={{ color:'#555555', fontSize:11, marginLeft:6 }}>{Math.round(stage.value/Math.max(1,total)*100)}%</span>
+                <div style={{ width:110, flexShrink:0, fontVariantNumeric:'tabular-nums' }}>
+                  <div style={{ fontSize:13 }}>
+                    <span style={{ color:'#ffffff', fontWeight:600 }}>{stage.value.toLocaleString()}</span>
+                    {i > 0 && <span style={{ fontSize:11, marginLeft:6, color:bmkColor||'#555555', fontWeight:bmkColor?600:400 }}>{stagePct}%</span>}
+                  </div>
+                  {stage.bmk && (
+                    <div style={{ fontSize:10, color:'#444444', marginTop:1 }}>{stage.bmk.text}</div>
+                  )}
                 </div>
+                {stage.filter
+                  ? <span className="ca-funnel-cta">Leads ↗</span>
+                  : <span style={{ width:56, flexShrink:0 }}/>}
               </div>
             </div>
           )
         })}
       </div>
-      {tooltip && (
-        <div style={{ position:'fixed', left:tooltip.x+14, top:tooltip.y-36, background:'#1e1e1e', border:'1px solid #3a3a3a', borderRadius:8, padding:'8px 12px', fontSize:12, color:'#cccccc', pointerEvents:'none', zIndex:9999 }}>
-          <div style={{ fontWeight:600, marginBottom:3 }}>{tooltip.stage.label}</div>
-          <div style={{ color:'#888888' }}>{tooltip.stage.value.toLocaleString()} leads · {Math.round(tooltip.stage.value/Math.max(1,total)*100)}% of total</div>
-          {tooltip.stage.filter && <div style={{ color:'#a78bfa', marginTop:4, fontSize:11 }}>Click to view in Leads ↗</div>}
-        </div>
-      )}
     </div>
   )
 }
@@ -504,17 +630,17 @@ function Heatmap({ logs }) {
             </div>
           ))}
           {DAY_LABELS.map((day,di) => (
-            <>
-              <div key={`d${di}`} style={{ fontSize:10, color:'#666666', display:'flex', alignItems:'center', justifyContent:'flex-end', paddingRight:6 }}>{day}</div>
+            <React.Fragment key={di}>
+              <div style={{ fontSize:10, color:'#666666', display:'flex', alignItems:'center', justifyContent:'flex-end', paddingRight:6 }}>{day}</div>
               {grid[di].map((cell,hi) => {
                 const val = cellVal(cell)
                 return (
-                  <div key={hi} style={{ height:18, borderRadius:2, background:cellColor(val), cursor:cell.calls>0?'pointer':'default' }}
+                  <div key={`${di}-${hi}`} style={{ height:18, borderRadius:2, background:cellColor(val), cursor:cell.calls>0?'pointer':'default' }}
                     onMouseEnter={e => cell.calls>0&&setTooltip({ x:e.clientX, y:e.clientY, di, hi, cell })}
                     onMouseLeave={() => setTooltip(null)}/>
                 )
               })}
-            </>
+            </React.Fragment>
           ))}
         </div>
       </div>
@@ -624,22 +750,25 @@ function VendorTable({ leads, logs }) {
     const vm = {}
     leads.forEach(l => {
       const v = l.vendor||'Unknown'
-      if (!vm[v]) vm[v] = { leads:0, calls:0, contacts:0, appts:0, sold:0, dailyMap:{} }
+      if (!vm[v]) vm[v] = { leads:0, calls:0, contactedLeads:new Set(), appts:0, sold:0, dailyMap:{} }
       vm[v].leads++
     })
     logs.forEach(l => {
-      const v = leads.find(ld => ld.id===l.leadId)?.vendor||'Unknown'
+      const lead = leads.find(ld => ld.id===l.leadId)
+      const v = lead?.vendor||'Unknown'
       if (!vm[v]) return
       vm[v].calls++
-      if (l.dispositions.some(d => CONTACT_SET.has(d))) vm[v].contacts++
+      // Contact Rate = leads reached ÷ leads received (not calls)
+      if (l.dispositions.some(d => CONTACT_SET.has(d))) vm[v].contactedLeads.add(l.leadId)
       if (l.dispositions.includes('Appointment Set')) vm[v].appts++
       if (l.dispositions.includes('Sold')) vm[v].sold++
       const day = l.loggedAt.split('T')[0]
       vm[v].dailyMap[day] = (vm[v].dailyMap[day]||0)+1
     })
     return Object.entries(vm).map(([name,s]) => ({
-      name, ...s,
-      cr: s.calls>0 ? Math.round(s.contacts/s.calls*100) : 0,
+      name, leads:s.leads, calls:s.calls, appts:s.appts, sold:s.sold,
+      contactedLeads: s.contactedLeads.size,
+      cr: s.leads>0 ? Math.round(s.contactedLeads.size/s.leads*100) : 0,
       sparkData: Object.entries(s.dailyMap).sort((a,b)=>a[0]<b[0]?-1:1).slice(-7).map(e=>e[1]),
     }))
   }, [leads, logs])
@@ -661,7 +790,7 @@ function VendorTable({ leads, logs }) {
                 <th style={{ width:'20%' }}>Vendor</th>
                 <th style={{ width:'10%', textAlign:'right', cursor:'pointer' }} onClick={()=>handleSort('leads')}>Leads<SortIcon k="leads"/></th>
                 <th style={{ width:'10%', textAlign:'right', cursor:'pointer' }} onClick={()=>handleSort('calls')}>Calls<SortIcon k="calls"/></th>
-                <th style={{ width:'24%', cursor:'pointer' }} onClick={()=>handleSort('cr')}>Contact Rate<SortIcon k="cr"/></th>
+                <th style={{ width:'24%', cursor:'pointer', title:'Leads reached ÷ leads received (avg 30–45%)' }} onClick={()=>handleSort('cr')}>Contact Rate<SortIcon k="cr"/></th>
                 <th style={{ width:'10%', textAlign:'right', cursor:'pointer' }} onClick={()=>handleSort('appts')}>Appts<SortIcon k="appts"/></th>
                 <th style={{ width:'10%', textAlign:'right', cursor:'pointer' }} onClick={()=>handleSort('sold')}>Sold<SortIcon k="sold"/></th>
                 <th style={{ width:'16%' }}>7d Trend</th>
@@ -698,87 +827,366 @@ function VendorTable({ leads, logs }) {
 }
 
 // ── Goals tab ──────────────────────────────────────────────────────────────────
+// Math basis: 50 working weeks/yr, 50/12 weeks/month, 5 days/week
+const WKS_PER_YR  = 50
+const WKS_PER_MO  = 50 / 12   // 4.1̄6̄
+const DAYS_PER_WK = 5
+
+function GoalDailyInput({ value, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [raw,     setRaw]     = useState('')
+
+  function commit() {
+    const n = parseInt(raw.replace(/[^0-9]/g,''), 10)
+    if (n > 0) onSave(n)
+    setEditing(false)
+  }
+
+  if (!editing) return (
+    <button onClick={() => { setRaw(String(value)); setEditing(true) }}
+      title="Click to edit"
+      style={{ fontSize:15, fontWeight:700, color:'#ffffff', background:'none', border:'1px dashed transparent',
+        borderRadius:6, padding:'3px 6px', cursor:'text', fontVariantNumeric:'tabular-nums', fontFamily:'inherit',
+        lineHeight:1, transition:'border-color 120ms ease' }}
+      onMouseEnter={e => e.currentTarget.style.borderColor='#3a3a3a'}
+      onMouseLeave={e => e.currentTarget.style.borderColor='transparent'}>
+      {value.toLocaleString()}
+    </button>
+  )
+
+  return (
+    <input autoFocus type="text" value={raw}
+      onChange={e => setRaw(e.target.value.replace(/[^0-9]/g,''))}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key==='Enter') commit(); if (e.key==='Escape') setEditing(false) }}
+      style={{ width:64, height:28, background:'#1a1a1a', border:'1px solid #7c3aed', borderRadius:6,
+        color:'#ffffff', fontSize:14, fontWeight:700, textAlign:'center', padding:'0 6px',
+        fontFamily:'inherit', fontVariantNumeric:'tabular-nums', outline:'none' }}/>
+  )
+}
+
+function PacePill({ status }) {
+  if (!status) return null
+  const c = status==='On Track' ? '#4caf84' : status==='At Risk' ? '#f59e0b' : '#e05c5c'
+  return (
+    <span style={{ fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:999, color:c,
+      background:`${c}1a`, letterSpacing:'0.4px', textTransform:'uppercase', flexShrink:0, whiteSpace:'nowrap' }}>
+      {status}
+    </span>
+  )
+}
+
+function WitInput({ field, value, label, onChange }) {
+  const [focused, setFocused] = useState(false)
+  const [raw,     setRaw]     = useState('')
+
+  function handleFocus() { setFocused(true); setRaw(value > 0 ? String(Math.round(value)) : '') }
+  function handleBlur()  { setFocused(false); const n = parseInt(raw, 10); if (n > 0) onChange(field, n) }
+  function handleChange(e) {
+    const v = e.target.value.replace(/[^0-9]/g, '')
+    setRaw(v)
+    const n = parseInt(v, 10)
+    if (n > 0) onChange(field, n)
+  }
+
+  const display = focused ? raw : (value > 0 ? Math.round(value).toLocaleString() : '')
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+      <div style={{ display:'flex', alignItems:'center', background:'#141414', border:'1px solid #2a2a2a',
+        borderRadius:8, height:40, overflow:'hidden' }}>
+        <span style={{ padding:'0 10px', fontSize:14, fontWeight:600, color:'#444444',
+          borderRight:'1px solid #232323', height:'100%', display:'flex', alignItems:'center', userSelect:'none' }}>$</span>
+        <input type="text" value={display}
+          onFocus={handleFocus} onBlur={handleBlur} onChange={handleChange}
+          onKeyDown={e => { if (e.key==='Enter') e.target.blur() }}
+          style={{ flex:1, height:'100%', background:'transparent', border:'none', outline:'none',
+            color:'#ffffff', fontSize:15, fontWeight:600, textAlign:'center', padding:'0 8px',
+            fontFamily:'inherit', fontVariantNumeric:'tabular-nums' }}/>
+      </div>
+      <div style={{ fontSize:10, color:'#888888', textTransform:'uppercase', letterSpacing:'0.5px', textAlign:'center' }}>{label}</div>
+    </div>
+  )
+}
+
 function GoalsTab({ logs }) {
-  const DEFAULTS = { calls:250, appts:10, sales:2 }
-  const [goals, setGoals] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('ffl_call_goals')||'null')||DEFAULTS } catch { return DEFAULTS }
+  const DEFAULTS = {
+    calls_day:    250,
+    contacts_day: 25,
+    appts_day:    5,
+    sales_day:    1,
+    avg_ap_per_sale: BENCHMARKS.avgApPerSale,
+  }
+
+  const [goals,    setGoals]    = useState(() => {
+    try { const g = JSON.parse(localStorage.getItem('ffl_call_goals')||'null'); return g ? {...DEFAULTS,...g} : DEFAULTS } catch { return DEFAULTS }
   })
-  const [editing, setEditing] = useState(null)
-  const [editVal, setEditVal] = useState('')
+  const [witWeek,  setWitWeek]  = useState(null)
+  const [witMonth, setWitMonth] = useState(null)
+  const [witYear,  setWitYear]  = useState(null)
 
   const now = new Date()
+
+  // Week (Sun–Sat)
   const weekStart = new Date(now)
   weekStart.setDate(weekStart.getDate() - weekStart.getDay())
   weekStart.setHours(0,0,0,0)
-  const weekLogs = logs.filter(l => new Date(l.loggedAt) >= weekStart)
-  const weekCalls = weekLogs.length
-  const weekAppts = weekLogs.filter(l => l.dispositions.includes('Appointment Set')).length
-  const weekSales = weekLogs.filter(l => l.dispositions.includes('Sold')).length
+  const weekLogs     = logs.filter(l => new Date(l.loggedAt) >= weekStart)
+  const weekCalls    = weekLogs.length
+  const weekContacts = weekLogs.filter(l => l.dispositions.some(d => CONTACT_SET.has(d))).length
+  const weekAppts    = weekLogs.filter(l => l.dispositions.includes('Appointment Set')).length
+  const weekSales    = weekLogs.filter(l => l.dispositions.includes('Sold')).length
 
+  // Today
+  const todayStart    = new Date(now); todayStart.setHours(0,0,0,0)
+  const todayLogs     = logs.filter(l => new Date(l.loggedAt) >= todayStart)
+  const todayCalls    = todayLogs.length
+  const todayContacts = todayLogs.filter(l => l.dispositions.some(d => CONTACT_SET.has(d))).length
+  const todayAppts    = todayLogs.filter(l => l.dispositions.includes('Appointment Set')).length
+  const todaySales    = todayLogs.filter(l => l.dispositions.includes('Sold')).length
+
+  // Working days elapsed Mon–Fri; Sun=0, Sat=5
   const dow = now.getDay()
-  const daysElapsed = Math.max(1, dow===0?7:dow)
-  const pace = v => Math.round(v*7/daysElapsed)
+  const workDaysElapsed = dow === 0 ? 0 : Math.min(DAYS_PER_WK, dow === 6 ? DAYS_PER_WK : dow)
 
-  function saveGoals(g) { setGoals(g); try { localStorage.setItem('ffl_call_goals', JSON.stringify(g)) } catch {} }
-
-  function getStatus(curr, goal) {
-    const r = pace(curr)/goal
-    if (r>=0.90) return 'On Track'
-    if (r>=0.65) return 'At Risk'
-    return 'Off Track'
+  function saveGoals(patch) {
+    const ng = {...goals,...patch}
+    setGoals(ng)
+    try { localStorage.setItem('ffl_call_goals', JSON.stringify(ng)) } catch {}
   }
-  function statusColor(s) { return s==='On Track'?'#4caf84':s==='At Risk'?'#f59e0b':'#e05c5c' }
 
-  const metrics = [
-    { key:'calls', label:'Calls / Week',        current:weekCalls, goal:goals.calls },
-    { key:'appts', label:'Appointments / Week',  current:weekAppts, goal:goals.appts },
-    { key:'sales', label:'Sales / Week',         current:weekSales, goal:goals.sales },
+  function getTodayStatus(curr, goal) {
+    if (!goal) return null
+    const r = curr / goal
+    if (r >= 0.85) return 'On Track'; if (r >= 0.50) return 'At Risk'; return 'Off Track'
+  }
+  function getWeekStatus(curr, weekGoal) {
+    if (!weekGoal) return null
+    const exp = weekGoal * (Math.max(1, workDaysElapsed) / DAYS_PER_WK)
+    const r = curr / Math.max(0.01, exp)
+    if (r >= 0.85) return 'On Track'; if (r >= 0.55) return 'At Risk'; return 'Off Track'
+  }
+  function sColor(s) { return s==='On Track'?'#4caf84':s==='At Risk'?'#f59e0b':'#e05c5c' }
+
+  // ── Rates — mixed sourcing ─────────────────────────────────────────────────
+  const totalCalls    = logs.length
+  const totalContacts = logs.filter(l => l.dispositions.some(d => CONTACT_SET.has(d))).length
+  const totalAppts    = logs.filter(l => l.dispositions.includes('Appointment Set')).length
+  const totalSold     = logs.filter(l => l.dispositions.includes('Sold')).length
+
+  const useOwnCall = totalCalls >= 20
+  const useOwnSale = totalSold  >= 5
+
+  const answerRate = useOwnCall ? totalContacts / Math.max(1, totalCalls) : 0.10
+  const apptRate   = useOwnSale ? totalAppts    / Math.max(1, totalContacts) : 0.30
+  const closeRate  = useOwnSale ? totalSold     / Math.max(1, totalAppts)   : 0.25
+  const avgAP      = useOwnSale ? (goals.avg_ap_per_sale || BENCHMARKS.avgApPerSale) : BENCHMARKS.avgApPerSale
+
+  // Source line
+  function buildSourceLine() {
+    const own = [], ind = []
+    if (useOwnCall) own.push('answer rate'); else ind.push('answer rate')
+    if (useOwnSale) { own.push('appointment rate'); own.push('close rate') }
+    else { ind.push('appointment rate'); ind.push('close rate') }
+    if (own.length && ind.length) {
+      const missing = []
+      if (!useOwnCall) missing.push(`${Math.max(0,20-totalCalls)} more call${20-totalCalls===1?'':'s'}`)
+      if (!useOwnSale) missing.push(`${Math.max(0,5-totalSold)} more sale${5-totalSold===1?'':'s'}`)
+      return `Using your numbers for ${own.join(', ')} · industry averages for ${ind.join(', ')}${missing.length ? ` — log ${missing.join(' and ')} to use your own` : ''}`
+    }
+    if (own.length) return 'Using your numbers for all rates'
+    const missing = []
+    if (!useOwnCall) missing.push(`${Math.max(0,20-totalCalls)} more call${20-totalCalls===1?'':'s'}`)
+    if (!useOwnSale) missing.push(`${Math.max(0,5-totalSold)} more sale${5-totalSold===1?'':'s'}`)
+    return `Using industry averages${missing.length ? ` — log ${missing.join(' and ')} to use your own numbers` : ''}`
+  }
+
+  // ── Agent standard AP projection ──────────────────────────────────────────
+  const agentApWeek = Math.round(goals.sales_day * DAYS_PER_WK * avgAP)
+  const agentApMo   = Math.round(agentApWeek * WKS_PER_MO)
+  const agentApYr   = agentApWeek * WKS_PER_YR
+
+  // ── WIT inputs — default to agent standard ────────────────────────────────
+  const effWitWeek  = (witWeek  != null) ? witWeek  : agentApWeek
+  const effWitMonth = (witMonth != null) ? witMonth : agentApMo
+  const effWitYear  = (witYear  != null) ? witYear  : agentApYr
+
+  function updateWit(field, n) {
+    if (!isFinite(n) || n <= 0) return
+    if (field === 'week')  { setWitWeek(n); setWitMonth(Math.round(n*WKS_PER_MO)); setWitYear(n*WKS_PER_YR) }
+    if (field === 'month') { const wk=n/WKS_PER_MO; setWitMonth(n); setWitWeek(Math.round(wk)); setWitYear(Math.round(wk*WKS_PER_YR)) }
+    if (field === 'year')  { const wk=n/WKS_PER_YR; setWitYear(n); setWitWeek(Math.round(wk)); setWitMonth(Math.round(wk*WKS_PER_MO)) }
+  }
+
+  // ── WIT calculation ────────────────────────────────────────────────────────
+  function calcWit(apWeek) {
+    const t = apWeek
+    if (!t || isNaN(t) || t <= 0) return null
+    const salesWk  = t / avgAP
+    const apptsWk  = salesWk  / Math.max(0.001, closeRate)
+    const contWk   = apptsWk  / Math.max(0.001, apptRate)
+    const callsWk  = contWk   / Math.max(0.001, answerRate)
+    function intRow(wk) {
+      return { day:Math.ceil(wk/DAYS_PER_WK), week:Math.ceil(wk), month:Math.round(wk*WKS_PER_MO), year:Math.round(wk*WKS_PER_YR) }
+    }
+    function sRow(wk) {
+      const d = wk / DAYS_PER_WK
+      return { day: d<1 ? (Math.round(d*10)/10) : Math.ceil(d), week:Math.ceil(wk), month:Math.round(wk*WKS_PER_MO), year:Math.round(wk*WKS_PER_YR) }
+    }
+    return { calls:intRow(callsWk), contacts:intRow(contWk), appts:intRow(apptsWk), sales:sRow(salesWk) }
+  }
+  const wit = calcWit(effWitWeek)
+
+  // Gap line
+  const gapMult        = agentApWeek > 0 ? effWitWeek / agentApWeek : 1
+  const showGap        = Math.abs(gapMult - 1) > 0.05 && agentApWeek > 0
+  const standardSalesWk = goals.sales_day * DAYS_PER_WK
+
+  const METRICS = [
+    { key:'calls',    label:'Calls',        goalKey:'calls_day',    today:todayCalls,    week:weekCalls    },
+    { key:'contacts', label:'Contacts',     goalKey:'contacts_day', today:todayContacts, week:weekContacts },
+    { key:'appts',    label:'Appointments', goalKey:'appts_day',    today:todayAppts,    week:weekAppts    },
+    { key:'sales',    label:'Sales',        goalKey:'sales_day',    today:todaySales,    week:weekSales    },
   ]
+
+  const TH = { fontSize:10, color:'#555555', textTransform:'uppercase', letterSpacing:'0.6px', fontWeight:500, paddingBottom:10 }
 
   return (
     <div style={{ padding:'24px' }}>
-      <div style={{ marginBottom:20, fontSize:12, color:'#555555' }}>
-        Week of {weekStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})} · {daysElapsed} of 7 days elapsed
+
+      {/* ── Goals Table ──────────────────────────────────────────────────────── */}
+      <div style={{ fontSize:10, color:'#555555', textTransform:'uppercase', letterSpacing:'0.6px', marginBottom:14 }}>
+        Goals · {weekStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})} · day {Math.max(1,workDaysElapsed)} of {DAYS_PER_WK}
       </div>
-      <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
-        {metrics.map(m => {
-          const fillPct = Math.min(100, Math.round(m.current/Math.max(1,m.goal)*100))
-          const status  = getStatus(m.current, m.goal)
-          const paceVal = pace(m.current)
-          const isEditing = editing===m.key
+
+      <div style={{ display:'grid', gridTemplateColumns:'96px 72px 1fr 1fr', gap:'0 6px' }}>
+        {/* Headers */}
+        <div style={TH}>Metric</div>
+        <div style={{...TH, textAlign:'center'}}>Daily Goal</div>
+        <div style={{...TH, textAlign:'center'}}>Today</div>
+        <div style={{...TH, textAlign:'center'}}>This Week</div>
+
+        {/* Rows */}
+        {METRICS.map((m, mi) => {
+          const dayGoal  = goals[m.goalKey] || 1
+          const weekGoal = dayGoal * DAYS_PER_WK
+          const tdStatus = getTodayStatus(m.today, dayGoal)
+          const wkStatus = getWeekStatus(m.week, weekGoal)
+          const tdClr    = sColor(tdStatus)
+          const wkClr    = sColor(wkStatus)
+          const tdPct    = Math.min(100, m.today / Math.max(0.01, dayGoal) * 100)
+          const wkPct    = Math.min(100, m.week  / Math.max(0.01, weekGoal) * 100)
+          const border   = mi < METRICS.length-1 ? '1px solid #181818' : '1px solid #1e1e1e'
+
           return (
-            <div key={m.key}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10, gap:12 }}>
-                <span style={{ fontSize:13, color:'#cccccc', fontWeight:500 }}>{m.label}</span>
-                <div style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
-                  <span style={{ fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:999, color:statusColor(status), background:`${statusColor(status)}18` }}>{status}</span>
-                  {isEditing ? (
-                    <div style={{ display:'flex', gap:4 }}>
-                      <input type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} autoFocus
-                        style={{ width:64, height:26, background:'#1e1e1e', border:'1px solid #3a3a3a', borderRadius:6, color:'#ffffff', fontSize:12, textAlign:'right', padding:'0 8px', fontFamily:'inherit' }}
-                        onKeyDown={e=>{ if(e.key==='Enter'){saveGoals({...goals,[m.key]:parseInt(editVal)||m.goal});setEditing(null)} if(e.key==='Escape')setEditing(null) }}/>
-                      <button onClick={()=>{saveGoals({...goals,[m.key]:parseInt(editVal)||m.goal});setEditing(null)}}
-                        style={{ height:26, padding:'0 10px', background:'#7c3aed', border:'none', borderRadius:6, color:'#ffffff', fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>Save</button>
-                    </div>
-                  ) : (
-                    <span onClick={()=>{setEditing(m.key);setEditVal(String(m.goal))}}
-                      style={{ fontSize:12, color:'#555555', cursor:'pointer', fontVariantNumeric:'tabular-nums' }}
-                      title="Click to edit goal">Goal: {m.goal}</span>
-                  )}
+            <React.Fragment key={m.key}>
+              <div style={{ fontSize:13, color:'#cccccc', fontWeight:500, display:'flex', alignItems:'center', padding:'13px 0', borderBottom:border }}>{m.label}</div>
+
+              <div style={{ display:'flex', justifyContent:'center', alignItems:'center', padding:'13px 0', borderBottom:border }}>
+                <GoalDailyInput value={dayGoal} onSave={v => saveGoals({[m.goalKey]: v})}/>
+              </div>
+
+              {/* Today */}
+              <div style={{ padding:'13px 6px', borderBottom:border }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
+                  <span style={{ fontSize:14, fontWeight:700, color:'#ffffff', fontVariantNumeric:'tabular-nums' }}>{m.today}</span>
+                  <PacePill status={tdStatus}/>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ flex:1, height:3, background:'#1a1a1a', borderRadius:999, overflow:'hidden' }}>
+                    <div style={{ height:'100%', width:`${tdPct}%`, background:tdClr, borderRadius:999, transition:'width 0.4s' }}/>
+                  </div>
+                  <span style={{ fontSize:11, color:'#3a3a3a', fontVariantNumeric:'tabular-nums', minWidth:24, textAlign:'right' }}>{dayGoal.toLocaleString()}</span>
                 </div>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:6 }}>
-                <div style={{ flex:1, height:6, background:'#1e1e1e', borderRadius:999, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${fillPct}%`, background:statusColor(status), borderRadius:999, transition:'width 0.4s ease' }}/>
+
+              {/* This Week */}
+              <div style={{ padding:'13px 0 13px 6px', borderBottom:border }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
+                  <span style={{ fontSize:14, fontWeight:700, color:'#ffffff', fontVariantNumeric:'tabular-nums' }}>{m.week}</span>
+                  <PacePill status={wkStatus}/>
                 </div>
-                <span style={{ fontSize:12, color:'#888888', fontVariantNumeric:'tabular-nums', minWidth:48, textAlign:'right' }}>{m.current} / {m.goal}</span>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ flex:1, height:3, background:'#1a1a1a', borderRadius:999, overflow:'hidden' }}>
+                    <div style={{ height:'100%', width:`${wkPct}%`, background:wkClr, borderRadius:999, transition:'width 0.4s' }}/>
+                  </div>
+                  <span style={{ fontSize:11, color:'#3a3a3a', fontVariantNumeric:'tabular-nums', minWidth:28, textAlign:'right' }}>{weekGoal.toLocaleString()}</span>
+                </div>
               </div>
-              <div style={{ fontSize:11, color:'#555555' }}>
-                Pace: {paceVal} · {paceVal>=m.goal ? '✓ on track to hit goal' : `${m.goal-paceVal} behind target pace`}
-              </div>
-            </div>
+            </React.Fragment>
           )
         })}
+      </div>
+
+      {/* AP projection */}
+      <div style={{ marginTop:18, paddingTop:18, borderTop:'1px solid #1e1e1e' }}>
+        <div style={{ fontSize:10, color:'#444444', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:7 }}>Your standard produces</div>
+        <div style={{ display:'flex', alignItems:'baseline', gap:8, flexWrap:'wrap' }}>
+          <span style={{ fontSize:22, fontWeight:600, color:'#ffffff', fontVariantNumeric:'tabular-nums' }}>${agentApWeek.toLocaleString()}</span>
+          <span style={{ fontSize:12, color:'#555555' }}>AP/week</span>
+          <span style={{ fontSize:12, color:'#2a2a2a' }}>·</span>
+          <span style={{ fontSize:12, color:'#444444', fontVariantNumeric:'tabular-nums' }}>${agentApMo.toLocaleString()}/mo</span>
+          <span style={{ fontSize:12, color:'#2a2a2a' }}>·</span>
+          <span style={{ fontSize:12, color:'#444444', fontVariantNumeric:'tabular-nums' }}>${agentApYr.toLocaleString()}/yr</span>
+        </div>
+      </div>
+
+      {/* ── What It Takes ─────────────────────────────────────────────────────── */}
+      <div style={{ height:1, background:'#1e1e1e', margin:'28px 0 22px' }}/>
+      <div style={{ fontSize:10, color:'#555555', textTransform:'uppercase', letterSpacing:'0.6px', marginBottom:4 }}>What It Takes</div>
+      <div style={{ fontSize:11, color:'#3a3a3a', marginBottom:20, lineHeight:1.6 }}>{buildSourceLine()}</div>
+
+      {/* AP GOAL inputs */}
+      <div style={{ fontSize:10, color:'#888888', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:12 }}>AP Goal</div>
+      <div style={{ display:'flex', gap:10, marginBottom: showGap ? 12 : 24, flexWrap:'wrap' }}>
+        {[
+          { field:'week',  val:effWitWeek,  lbl:'AP per week'  },
+          { field:'month', val:effWitMonth, lbl:'AP per month' },
+          { field:'year',  val:effWitYear,  lbl:'AP per year'  },
+        ].map(f => (
+          <WitInput key={f.field} field={f.field} value={f.val} label={f.lbl} onChange={updateWit}/>
+        ))}
+      </div>
+
+      {/* Gap line */}
+      {showGap && (
+        <div style={{ fontSize:12, color:'#f59e0b', marginBottom:20, lineHeight:1.5 }}>
+          {'Your standard produces $'}{agentApWeek.toLocaleString()}{'/wk. '}
+          {'This target needs '}{(Math.round(gapMult*10)/10)}{'× the activity'}
+          {wit && standardSalesWk > 0 ? ` — ${wit.sales.week} sales/wk instead of ${standardSalesWk}` : ''}.
+        </div>
+      )}
+
+      {/* Result cards */}
+      {wit && (
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
+          {[
+            { label:'Calls Needed',        vals:wit.calls,    color:'#7c3aed' },
+            { label:'Contacts Needed',     vals:wit.contacts, color:'#22d3ee' },
+            { label:'Appointments Needed', vals:wit.appts,    color:'#4caf84' },
+            { label:'Sales Needed',        vals:wit.sales,    color:'#f59e0b' },
+          ].map(c => (
+            <div key={c.label} style={{ background:'#111111', border:'1px solid #2a2a2a', borderRadius:10, padding:'14px 16px', borderTop:`2px solid ${c.color}` }}>
+              <div style={{ fontSize:10, color:'#888888', textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:10 }}>{c.label}</div>
+              {/* Day first — visual anchor */}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:8 }}>
+                <span style={{ fontSize:11, color:'#555555' }}>Day</span>
+                <span style={{ fontSize:22, fontWeight:700, color:'#ffffff', fontVariantNumeric:'tabular-nums', letterSpacing:'-0.5px' }}>{c.vals.day}</span>
+              </div>
+              {[['Week',c.vals.week],['Month',c.vals.month],['Year',c.vals.year]].map(([p,v]) => (
+                <div key={p} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:3 }}>
+                  <span style={{ fontSize:11, color:'#444444' }}>{p}</span>
+                  <span style={{ fontSize:12, color:'#666666', fontVariantNumeric:'tabular-nums' }}>{v.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Industry footnote */}
+      <div style={{ marginTop:20, fontSize:11, color:'#2e2e2e', lineHeight:1.6, fontStyle:'italic' }}>
+        Industry reference: a full-time final expense agent runs 15–25 appointments per week and writes $3,000–4,000 AP. Average policy is $600–1,200 annual premium.
       </div>
     </div>
   )
@@ -810,11 +1218,12 @@ function ActivityTab({ leads, logs, sparkData }) {
   const untouched = leads.filter(l=>!(logsByLead[l.id]||[]).length)
   const oldestDays = untouched.reduce((max,l) => !l.receivedAt?max:Math.max(max,Math.floor((Date.now()-new Date(l.receivedAt))/86400000)),0)
 
-  const cbLeads = leads.filter(l=>(logsByLead[l.id]||[]).some(lg=>lg.dispositions.includes('Callback')))
+  const cbLeads = leads.filter(l => deriveCurrentState(logsByLead[l.id]||[]).state === 'Callback')
   const cbFollowed = cbLeads.filter(l => {
-    const ll=(logsByLead[l.id]||[]).sort((a,b)=>new Date(a.loggedAt)-new Date(b.loggedAt))
-    const ci=ll.findIndex(lg=>lg.dispositions.includes('Callback'))
-    return ci>=0&&ll.length>ci+1
+    const ll = (logsByLead[l.id]||[]).sort((a,b) => new Date(b.loggedAt)-new Date(a.loggedAt))
+    const { stateLogId } = deriveCurrentState(ll)
+    const cbLog = ll.find(lg => lg.id === stateLogId)
+    return cbLog && ll.some(lg => new Date(lg.loggedAt) > new Date(cbLog.loggedAt))
   }).length
 
   const stats = [
@@ -861,12 +1270,20 @@ export default function CallAnalytics({ onNavigate }) {
   const prevTotalCalls     = prevLogs.length
   const leadsContacted     = new Set(currLogs.map(l=>l.leadId)).size
   const prevLeadsContacted = new Set(prevLogs.map(l=>l.leadId)).size
-  const contactCalls       = currLogs.filter(l=>l.dispositions.some(d=>CONTACT_SET.has(d)))
-  const contactRate        = pct(contactCalls.length, totalCalls)
-  const prevContactCalls   = prevLogs.filter(l=>l.dispositions.some(d=>CONTACT_SET.has(d)))
-  const prevContactRate    = prevLogs.length>0 ? pct(prevContactCalls.length, prevLogs.length) : null
+  // Answer Rate = calls with contact disposition ÷ total calls (dial efficiency)
+  const answerCalls        = currLogs.filter(l=>l.dispositions.some(d=>CONTACT_SET.has(d)))
+  const answerRate         = pct(answerCalls.length, totalCalls)
+  const prevAnswerCalls    = prevLogs.filter(l=>l.dispositions.some(d=>CONTACT_SET.has(d)))
+  const prevAnswerRate     = prevLogs.length>0 ? pct(prevAnswerCalls.length, prevLogs.length) : null
   const appointmentsSet    = currLogs.filter(l=>l.dispositions.includes('Appointment Set')).length
   const prevAppts          = prevLogs.filter(l=>l.dispositions.includes('Appointment Set')).length
+
+  // Cohort leads for funnel: leads received in the selected range
+  const cohortLeads = range === 'all'
+    ? allLeads
+    : allLeads.filter(l => { const d = new Date(l.receivedAt); return d >= start && d <= end })
+
+  const cmpLabel = comparisonLabel(range)
 
   // Sparkline data (14-day daily lookback)
   const sparkDays = useMemo(() => getSparklineData(allLogs, 14, now), [allLogs])
@@ -906,10 +1323,21 @@ export default function CallAnalytics({ onNavigate }) {
   const KPI_ACCENT = ['#7c3aed','#3b82f6','#22d3ee','#4caf84']
 
   const kpis = [
-    { label:'Total Calls',      context:null,                      value:totalCalls.toLocaleString(),       curr:totalCalls,      prev:prevTotalCalls,    color:null,        sparkVals:sparkDays.map(d=>d.calls),          accentColor:'#7c3aed' },
-    { label:'Leads Contacted',  context:null,                      value:leadsContacted.toLocaleString(),   curr:leadsContacted,  prev:prevLeadsContacted,color:null,        sparkVals:sparkDays.map(d=>d.leadsContacted), accentColor:'#3b82f6' },
-    { label:'Contact Rate',     context:'Industry avg 8–12%',      value:`${contactRate}%`,                 curr:contactRate,     prev:prevContactRate,   color:null,        sparkVals:sparkDays.map(d=>d.cr),             accentColor:'#22d3ee' },
-    { label:'Appointments Set', context:null,                      value:appointmentsSet.toLocaleString(),  curr:appointmentsSet, prev:prevAppts,         color:'#4caf84',   sparkVals:sparkDays.map(d=>d.appts),          accentColor:'#4caf84' },
+    { label:'Total Calls',      context:null,                         tooltip:null,
+      value:totalCalls.toLocaleString(),      curr:totalCalls,      prev:prevTotalCalls,    color:null,
+      sparkVals:sparkDays.map(d=>d.calls),    accentColor:'#7c3aed' },
+    { label:'Leads Contacted',  context:null,
+      tooltip:'Leads you spoke with this period, including ones received before it. The funnel below counts only leads received this period.',
+      value:leadsContacted.toLocaleString(),  curr:leadsContacted,  prev:prevLeadsContacted, color:null,
+      subNote:'Includes leads received earlier',
+      sparkVals:sparkDays.map(d=>d.leadsContacted), accentColor:'#3b82f6' },
+    { label:'Answer Rate',      context:`Industry avg ${BENCHMARKS.answerRate.min}–${BENCHMARKS.answerRate.max}%`,
+      tooltip:'Of every 100 calls you made, this many reached a live person.',
+      value:`${answerRate}%`,                 curr:answerRate,      prev:prevAnswerRate,    color:null,
+      sparkVals:sparkDays.map(d=>d.cr),       accentColor:'#22d3ee' },
+    { label:'Appointments Set', context:null,                         tooltip:null,
+      value:appointmentsSet.toLocaleString(), curr:appointmentsSet, prev:prevAppts,         color:'#4caf84',
+      sparkVals:sparkDays.map(d=>d.appts),    accentColor:'#4caf84' },
   ]
 
   return (
@@ -952,18 +1380,22 @@ export default function CallAnalytics({ onNavigate }) {
 
       {/* KPI row */}
       <div className="ca-kpi-row">
-        {kpis.map((k,i) => (
+        {kpis.map((k) => (
           <div key={k.label} className="ca-kpi-card" style={{ borderTop:`2px solid ${k.accentColor}` }}>
             <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:4 }}>
-              <span className="ca-kpi-label">{k.label}</span>
+              <span className="ca-kpi-label" title={k.tooltip||undefined}
+                style={k.tooltip?{cursor:'help',borderBottom:'1px dotted #333333'}:{}}>
+                {k.label}
+              </span>
               {k.context && <span style={{ fontSize:10, color:'#888888' }}>{k.context}</span>}
             </div>
             <div className="ca-kpi-value" style={k.color?{color:k.color}:{}}>{k.value}</div>
+            {k.subNote && <div style={{ fontSize:10, color:'#444444', marginBottom:2 }}>{k.subNote}</div>}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', minHeight:24, gap:8 }}>
               <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                <DeltaPill curr={k.curr} prev={k.prev}/>
-                {k.prev!==null&&k.prev!==undefined&&(k.curr!==0||k.prev!==0) &&
-                  <span style={{ fontSize:11, color:'#555555' }}>vs prev</span>}
+                {cmpLabel && <DeltaPill curr={k.curr} prev={k.prev}/>}
+                {cmpLabel && k.prev!==null&&k.prev!==undefined&&(k.curr!==0||k.prev!==0) &&
+                  <span style={{ fontSize:11, color:'#555555' }}>{cmpLabel}</span>}
               </div>
               <Sparkline values={k.sparkVals} color={k.accentColor}/>
             </div>
@@ -971,8 +1403,8 @@ export default function CallAnalytics({ onNavigate }) {
         ))}
       </div>
 
-      {/* Conversion funnel */}
-      <ConversionFunnel leads={allLeads} logs={allLogs} onNavigate={onNavigate}/>
+      {/* Conversion funnel — cohort model: leads received in range, tracked all-time */}
+      <ConversionFunnel leads={cohortLeads} allLogs={allLogs} onNavigate={onNavigate} start={start} end={end} range={range}/>
 
       {/* Chart row */}
       <div className="ca-chart-row">
