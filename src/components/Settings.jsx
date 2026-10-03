@@ -752,105 +752,6 @@ function TabContracting({ agentInfo, onToast }) {
   )
 }
 
-// ── Tab 4: Calendar ───────────────────────────────────────────────────────────
-function TabCalendar({ onToast }) {
-  const defaultConns = { google: false, apple: false, calendly: false, calendlyUrl: '' }
-  const [conns,         setConns]         = useState(() => load('calendarConnections', defaultConns))
-  const [calendlyEdit,  setCalendlyEdit]  = useState(false)
-  const [calendlyDraft, setCalendlyDraft] = useState('')
-  const [appts] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('scheduled_appointments') || '[]') } catch { return [] }
-  })
-
-  const anyConnected = conns.google || conns.apple || conns.calendly
-
-  function handleConnect(p) {
-    if (p === 'google' || p === 'apple') { alert('OAuth integration coming in a future update.'); return }
-    if (p === 'calendly') { setCalendlyDraft(conns.calendlyUrl || ''); setCalendlyEdit(true) }
-  }
-  function handleDisconnect(p) {
-    const u = { ...conns, [p]: false }; if (p === 'calendly') u.calendlyUrl = ''
-    setConns(u); save('calendarConnections', u)
-  }
-  function saveCalendly() {
-    const u = { ...conns, calendly: !!calendlyDraft.trim(), calendlyUrl: calendlyDraft.trim() }
-    setConns(u); save('calendarConnections', u); setCalendlyEdit(false)
-    if (calendlyDraft.trim()) onToast('Changes saved successfully')
-  }
-
-  const CAL_SVCS = [
-    { id: 'google', label: 'Google Calendar', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h4"/><path d="M8 18h8"/></svg> },
-    { id: 'apple',  label: 'Apple Calendar',  icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="16" r="2"/></svg> },
-    { id: 'calendly', label: 'Calendly',      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
-  ]
-
-  const nextWeek = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() + i); return d.toISOString().split('T')[0]
-  })
-  const upcoming = appts.filter(a => a.date && nextWeek.includes(a.date))
-
-  return (
-    <div className="stg-tab-body">
-      <div className="stg-card">
-        <SectionHead>Calendar Connections</SectionHead>
-        <div className="stg-cal-cards">
-          {CAL_SVCS.map(svc => (
-            <div key={svc.id} className={`stg-cal-card${conns[svc.id] ? ' stg-cal-connected' : ''}`}>
-              <div className="stg-cal-card-icon">{svc.icon}</div>
-              <div className="stg-cal-card-body">
-                <div className="stg-cal-card-name">{svc.label}</div>
-                {conns[svc.id] && (
-                  <div className="stg-cal-status">
-                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#4caf84" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 5.5 4 8.5 10 2.5"/></svg>
-                    Connected
-                    {svc.id === 'calendly' && conns.calendlyUrl && <span className="stg-cal-url">{conns.calendlyUrl}</span>}
-                  </div>
-                )}
-                {svc.id === 'calendly' && calendlyEdit && (
-                  <div className="stg-calendly-row">
-                    <input className="stg-input stg-input-sm" value={calendlyDraft}
-                      onChange={e => setCalendlyDraft(e.target.value)} placeholder="https://calendly.com/yourname" />
-                    <button type="button" className="stg-btn-primary stg-btn-sm" onClick={saveCalendly}>Save</button>
-                    <button type="button" className="stg-btn-secondary stg-btn-sm" onClick={() => setCalendlyEdit(false)}>Cancel</button>
-                  </div>
-                )}
-              </div>
-              <div className="stg-cal-card-actions">
-                {conns[svc.id]
-                  ? <button type="button" className="stg-btn-danger-outline stg-btn-sm" onClick={() => handleDisconnect(svc.id)}>Disconnect</button>
-                  : <button type="button" className="stg-btn-secondary stg-btn-sm"       onClick={() => handleConnect(svc.id)}>Connect</button>
-                }
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {anyConnected && (
-        <div className="stg-card">
-          <SectionHead>Upcoming — Next 7 Days</SectionHead>
-          {upcoming.length === 0
-            ? <div className="stg-empty-msg">No upcoming appointments found.</div>
-            : <div className="stg-appt-list">{upcoming.map((a, i) => (
-                <div key={i} className="stg-appt-item">
-                  <div className="stg-appt-date">{a.date}</div>
-                  <div className="stg-appt-name">{a.name || 'Unnamed'}</div>
-                  {a.time && <div className="stg-appt-time">{a.time}</div>}
-                </div>
-              ))}</div>
-          }
-        </div>
-      )}
-
-      <div className="stg-form-footer">
-        <button type="button" className="stg-btn-primary"
-          onClick={() => { save('calendarConnections', conns); onToast('Changes saved successfully') }}>
-          Save Changes
-        </button>
-      </div>
-    </div>
-  )
-}
 
 // ── Tab 6: Connectors ────────────────────────────────────────────────────────
 const CONNECTOR_DEFS = [
@@ -1278,7 +1179,6 @@ export default function Settings({ agentInfo }) {
     { id: 'profile',     label: 'Personal Profile'            },
     { id: 'agency',      label: 'Agency Profile', ownerOnly: true },
     { id: 'contracting', label: 'Contracting'                 },
-    { id: 'calendar',    label: 'Calendar'                    },
     { id: 'billing',     label: 'Plan / Billing'              },
     { id: 'connectors',  label: 'Connectors'                  },
   ]
@@ -1301,7 +1201,7 @@ export default function Settings({ agentInfo }) {
         <div className="stg-page-eyebrow">Account Management</div>
         <h1 className="stg-page-title">Settings</h1>
         <p className="stg-page-sub">
-          Manage your profile, agency details, contracting, calendar, and billing.
+          Manage your profile, agency details, contracting, and billing.
         </p>
       </div>
 
@@ -1318,7 +1218,6 @@ export default function Settings({ agentInfo }) {
       {activeTab === 'profile'     && <TabProfile     agentInfo={agentInfo}         onToast={showToast} />}
       {activeTab === 'agency'      && <TabAgency                                     onToast={showToast} />}
       {activeTab === 'contracting' && <TabContracting agentInfo={agentInfo}         onToast={showToast} />}
-      {activeTab === 'calendar'    && <TabCalendar                                   onToast={showToast} />}
       {activeTab === 'billing'     && <TabBilling     isAgencyOwner={isAgencyOwner} onToast={showToast} />}
       {activeTab === 'connectors'  && <TabConnectors                                 onToast={showToast} />}
 

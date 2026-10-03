@@ -612,9 +612,31 @@ function LeadsTableHeader() {
 }
 
 // ── Main Leads component ──────────────────────────────────────────────────────
-export default function Leads() {
+const CONTACT_SET_LEADS = new Set([
+  'Over 90 Seconds','Under 90 Seconds','Showed Numbers',
+  'Interested','Not Interested','Callback','Appointment Set','Sold',
+])
+
+const PREFILTER_TESTS = {
+  untouched:         (lead, logs) => !logs.some(l => l.leadId === lead.id),
+  needs_disposition: (lead, logs) => { const ll = logs.filter(l => l.leadId === lead.id); if (!ll.length) return false; const last = ll.sort((a,b) => new Date(b.loggedAt)-new Date(a.loggedAt))[0]; return last.dispositions.length === 0 },
+  overdue_callback:  (lead, logs) => { const cb = logs.filter(l => l.leadId === lead.id && l.dispositions.includes('Callback')).sort((a,b) => new Date(b.loggedAt)-new Date(a.loggedAt))[0]; return cb && (Date.now()-new Date(cb.loggedAt)) > 86400000 },
+  called:     (lead, logs) => logs.some(l => l.leadId === lead.id),
+  contacted:  (lead, logs) => logs.some(l => l.leadId === lead.id && l.dispositions.some(d => CONTACT_SET_LEADS.has(d))),
+  interested: (lead, logs) => logs.some(l => l.leadId === lead.id && (l.dispositions.includes('Interested') || l.dispositions.includes('Appointment Set') || l.dispositions.includes('Sold'))),
+  appt_set:   (lead, logs) => logs.some(l => l.leadId === lead.id && (l.dispositions.includes('Appointment Set') || l.dispositions.includes('Sold'))),
+  sold:       (lead, logs) => logs.some(l => l.leadId === lead.id && l.dispositions.includes('Sold')),
+}
+
+export default function Leads({ preFilter }) {
   const [leads, setLeads]           = useState(initLeads)
   const [callLogs, setCallLogs]     = useState(initCallLogs)
+  const [preFilterChip, setPreFilterChip] = useState(null)
+
+  useEffect(() => {
+    if (!preFilter) return
+    setPreFilterChip(preFilter.label || preFilter.type)
+  }, [])
   const [filtersOpen, setFiltersOpen]     = useState(false)
   const [showCreate, setShowCreate]       = useState(false)
   const [showCsv, setShowCsv]             = useState(false)
@@ -665,6 +687,11 @@ export default function Leads() {
   const filteredLeads = [...leads]
     .sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt))
     .filter(lead => {
+      // preFilter from analytics deep link
+      if (preFilter && preFilterChip) {
+        const testFn = PREFILTER_TESTS[preFilter.type]
+        if (testFn && !testFn(lead, callLogs)) return false
+      }
       // Live search / autocomplete
       if (filterSearchId) {
         if (lead.id !== filterSearchId) return false
@@ -799,6 +826,16 @@ export default function Leads() {
           <button className="leads-btn-teal" onClick={() => setShowCreate(true)}>+ Create Lead</button>
         </div>
       </div>
+
+      {preFilterChip && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 0 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 999, padding: '5px 12px', fontSize: 12, color: '#a78bfa' }}>
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><polygon points="1,1 11,1 7,6 7,11 5,11 5,6"/></svg>
+            Filtered: {preFilterChip}
+            <button onClick={() => setPreFilterChip(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', cursor: 'pointer', padding: '0 0 0 4px', fontSize: 14, lineHeight: 1, fontFamily: 'inherit' }}>×</button>
+          </div>
+        </div>
+      )}
 
       {filtersOpen && (
         <div className="leads-filter-bar">

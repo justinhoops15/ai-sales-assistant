@@ -5,7 +5,8 @@
       "name": "ai-sales-assistant",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 5173
+      "port": 5173,
+      "url": "http://localhost:5173"
     }
   ]
 }

@@ -6980,3 +6980,177 @@ textarea.field-input {
 }
 .leads-btn-delete:hover { background: rgba(224,92,92,0.2); }
 
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Call Analytics
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.ca-root {
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 0 60px;
+}
+
+/* Header */
+.ca-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 20px; padding: 32px 0 24px; flex-wrap: wrap;
+}
+.ca-title {
+  font-size: 24px; font-weight: 700; color: #ffffff;
+  margin: 0 0 4px; letter-spacing: -0.3px;
+}
+.ca-sub { font-size: 13px; color: #666666; margin: 0; }
+
+/* Range group */
+.ca-range-group {
+  display: flex; align-items: center;
+  background: #0a0a0a; border: 1px solid #2a2a2a;
+  border-radius: 999px; padding: 3px; gap: 2px;
+}
+.ca-range-btn {
+  height: 28px; padding: 0 14px; border-radius: 999px; border: none;
+  background: transparent; color: #888888; font-size: 12px; font-weight: 500;
+  font-family: inherit; cursor: pointer; transition: all 120ms ease; white-space: nowrap;
+}
+.ca-range-btn:hover { color: #cccccc; }
+.ca-range-btn.active { background: #7c3aed; color: #ffffff; }
+
+/* Action Banner */
+.ca-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: rgba(224,92,92,0.07); border: 1px solid rgba(224,92,92,0.35);
+  border-radius: 10px; padding: 12px 18px; margin-bottom: 20px;
+}
+.ca-banner-left { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.ca-banner-text { font-size: 13px; color: #888888; line-height: 1.4; }
+.ca-banner-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: #e05c5c; font-size: 13px; font-family: inherit; font-weight: 500;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.ca-banner-link:hover { color: #ff7070; }
+.ca-banner-sep { color: #555555; }
+.ca-banner-dismiss {
+  flex-shrink: 0; background: none; border: none; color: #555555;
+  font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1;
+  font-family: inherit;
+}
+.ca-banner-dismiss:hover { color: #888888; }
+
+/* KPI Row */
+.ca-kpi-row {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 12px;
+  margin-bottom: 12px;
+}
+.ca-kpi-card {
+  background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 14px;
+  padding: 20px 22px; border-top: none; transition: border-color 150ms ease;
+}
+.ca-kpi-card:hover { border-color: #3a3a3a; }
+.ca-kpi-label {
+  font-size: 11px; color: #888888; text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 8px;
+}
+.ca-kpi-value {
+  font-size: 32px; font-weight: 600; color: #ffffff;
+  letter-spacing: -0.5px; line-height: 1; margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.ca-kpi-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-height: 20px; }
+
+/* Base card */
+.ca-card {
+  background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 14px;
+  padding: 20px 22px; transition: border-color 150ms ease;
+}
+.ca-card:hover { border-color: #3a3a3a; }
+.ca-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; gap: 12px;
+}
+.ca-card-title { font-size: 13px; font-weight: 600; color: #cccccc; }
+.ca-legend { display: flex; align-items: center; gap: 14px; }
+.ca-legend-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: #666666;
+}
+
+/* Chart row */
+.ca-chart-row {
+  display: grid; grid-template-columns: 3fr 2fr; gap: 12px;
+  margin-bottom: 12px;
+}
+.ca-chart-main {} /* no extra styles needed */
+.ca-chart-side {}
+
+/* Tabbed panel */
+.ca-panel { padding: 0; }
+.ca-panel-tabs {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1px solid #2a2a2a; padding: 0 22px;
+}
+.ca-panel-tab {
+  height: 44px; padding: 0 14px; background: none; border: none;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  font-size: 13px; font-weight: 500; color: #888888; font-family: inherit;
+  cursor: pointer; transition: color 120ms ease;
+}
+.ca-panel-tab:hover { color: #cccccc; }
+.ca-panel-tab.active { color: #ffffff; border-bottom-color: #7c3aed; }
+
+/* Activity grid */
+.ca-activity-grid {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  gap: 0; padding: 0;
+}
+.ca-stat-block {
+  padding: 24px 24px 22px;
+  border-right: 1px solid #2a2a2a;
+}
+.ca-stat-block:last-child { border-right: none; }
+.ca-stat-value {
+  font-size: 28px; font-weight: 600; color: #ffffff;
+  letter-spacing: -0.4px; line-height: 1; margin-bottom: 8px;
+}
+.ca-stat-label {
+  font-size: 12px; font-weight: 600; color: #888888;
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.4px; font-size: 11px;
+}
+.ca-stat-caption { font-size: 12px; color: #555555; }
+
+/* Vendor table */
+.ca-vendor-wrap { overflow-x: auto; }
+.ca-vendor-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.ca-vendor-table th {
+  text-align: left; padding: 12px 24px; font-size: 11px; font-weight: 600;
+  color: #555555; text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 1px solid #2a2a2a;
+}
+.ca-vendor-table td {
+  padding: 12px 24px; color: #888888;
+  border-bottom: 1px solid #0d0d0d;
+}
+.ca-vendor-table tbody tr:last-child td { border-bottom: none; }
+.ca-vendor-table tbody tr:hover td { background: #141414; }
+
+/* Responsive */
+@media (max-width: 960px) {
+  .ca-kpi-row { grid-template-columns: repeat(2,1fr); }
+  .ca-chart-row { grid-template-columns: 1fr; }
+  .ca-activity-grid { grid-template-columns: repeat(2,1fr); }
+  .ca-stat-block:nth-child(2) { border-right: none; }
+  .ca-stat-block:nth-child(3) { border-right: 1px solid #2a2a2a; }
+  .ca-stat-block:nth-child(3),
+  .ca-stat-block:nth-child(4) { border-top: 1px solid #2a2a2a; }
+}
+@media (max-width: 600px) {
+  .ca-kpi-row { grid-template-columns: 1fr; }
+  .ca-activity-grid { grid-template-columns: 1fr; }
+  .ca-stat-block { border-right: none; border-top: 1px solid #2a2a2a; }
+  .ca-stat-block:first-child { border-top: none; }
+}
+

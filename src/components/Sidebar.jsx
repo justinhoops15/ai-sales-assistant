@@ -42,6 +42,18 @@ function IconLeads() {
   )
 }
 
+function IconAnalytics() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="2.5" y1="14" x2="2.5" y2="9.5"/>
+      <line x1="6"   y1="14" x2="6"   y2="5.5"/>
+      <line x1="9.5" y1="14" x2="9.5" y2="8"/>
+      <line x1="13"  y1="14" x2="13"  y2="3"/>
+      <polyline points="2.5,9 6,5 9.5,7.5 13,2.5" strokeWidth="1.2" opacity="0.75"/>
+    </svg>
+  )
+}
+
 function IconFollowUp() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -121,6 +133,14 @@ export default function Sidebar({ agentInfo, activeView, currentStep, onNavigate
         >
           <span className="sidebar-item-icon"><IconLeads /></span>
           Leads
+        </button>
+
+        <button
+          onClick={() => onNavigate('analytics')}
+          className={`sidebar-item${activeView === 'analytics' ? ' active' : ''}`}
+        >
+          <span className="sidebar-item-icon"><IconAnalytics /></span>
+          Call Analytics
         </button>
 
         <button
